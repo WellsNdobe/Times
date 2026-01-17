@@ -41,6 +41,7 @@ builder.Services.AddDbContext<DataContext>(options =>
 	)
 );
 builder.Services.AddScoped<IClientService, ClientService>();
+builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddOpenApi();
 
 

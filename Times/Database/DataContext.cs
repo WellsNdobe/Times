@@ -16,6 +16,8 @@ namespace Times.Database
 
 		public DbSet<User> Users => Set<User>();
 		public DbSet<Client> Clients => Set<Client>();
+		public DbSet<OrganizationMember> OrganizationMembers => Set<OrganizationMember>();
+		public DbSet<Organization> Organizations => Set<Organization>();
 
 
 	}

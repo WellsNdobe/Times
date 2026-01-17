@@ -1,4 +1,5 @@
-﻿namespace Times.Entities
+﻿using System.Collections.Generic;
+namespace Times.Entities
 {
     public class User
     {
@@ -18,7 +19,8 @@
 			public bool IsActive { get; set; } = true;
 
 			public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-		}
+		    public ICollection<OrganizationMember> OrganizationMemberships { get; set; } = new List<OrganizationMember>();
+	}
 	}
 
 

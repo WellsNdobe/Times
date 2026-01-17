@@ -6,15 +6,14 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Times.Database;
-using Times.Entities;
 
 #nullable disable
 
 namespace Times.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20260117080429_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260117154546_AddOrganizations")]
+    partial class AddOrganizations
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -52,32 +51,64 @@ namespace Times.Migrations
                     b.ToTable("Clients");
                 });
 
-			modelBuilder.Entity<Organization>(b =>
-			{
-				b.HasKey(x => x.Id);
-				b.Property(x => x.Name).IsRequired().HasMaxLength(200);
-				b.HasMany(x => x.Members)
-					.WithOne(m => m.Organization)
-					.HasForeignKey(m => m.OrganizationId)
-					.OnDelete(DeleteBehavior.Cascade);
-			});
+            modelBuilder.Entity("Times.Entities.Organization", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
 
-			modelBuilder.Entity<OrganizationMember>(b =>
-			{
-				b.HasKey(x => x.Id);
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
 
-				b.HasIndex(x => new { x.OrganizationId, x.UserId }).IsUnique();
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
 
-				b.HasOne(x => x.User)
-					.WithMany(u => u.OrganizationMemberships)
-					.HasForeignKey(x => x.UserId)
-					.OnDelete(DeleteBehavior.Cascade);
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-				b.Property(x => x.Role).IsRequired();
-			});
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
 
+                    b.HasKey("Id");
 
-			modelBuilder.Entity("Times.Entities.User", b =>
+                    b.ToTable("Organizations");
+                });
+
+            modelBuilder.Entity("Times.Entities.OrganizationMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("OrganizationMembers");
+                });
+
+            modelBuilder.Entity("Times.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -123,6 +154,35 @@ namespace Times.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Times.Entities.OrganizationMember", b =>
+                {
+                    b.HasOne("Times.Entities.Organization", "Organization")
+                        .WithMany("Members")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Times.Entities.User", "User")
+                        .WithMany("OrganizationMemberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Times.Entities.Organization", b =>
+                {
+                    b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("Times.Entities.User", b =>
+                {
+                    b.Navigation("OrganizationMemberships");
                 });
 #pragma warning restore 612, 618
         }
