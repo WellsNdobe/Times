@@ -6,13 +6,15 @@ using Scalar.AspNetCore;
 using Times.Database;
 using Times.Infrastructure.Auth;
 using Times.Infrastructure.Persistence;
+using Times.Services.Contracts;
+using Times.Services.Implementation;
 
 
 
 
 var builder = WebApplication.CreateBuilder(args);
 
-
+//Add Services
 builder.Services.AddControllers();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -33,15 +35,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 	});
 
 builder.Services.AddAuthorization();
-
 builder.Services.AddDbContext<DataContext>(options =>
 	options.UseSqlServer(
 		builder.Configuration.GetConnectionString("Default")
 	)
 );
-
-
+builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddOpenApi();
+
 
 var app = builder.Build();
 

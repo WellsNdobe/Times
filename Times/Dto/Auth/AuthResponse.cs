@@ -1,4 +1,4 @@
-namespace Times.Contracts.Auth
+namespace Times.Dto.Auth
 {
 	public record AuthResponse(
 		Guid UserId,

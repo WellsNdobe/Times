@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Times.Entities;
 using Times.Database;
 using Times.Infrastructure.Auth;
-using Times.Contracts.Auth;
+using Times.Dto.Auth;
 
 
 namespace Times.Controllers

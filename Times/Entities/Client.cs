@@ -2,7 +2,7 @@
 {
     public class Client
     {
-		public long Id { get; set; }
+		public Guid Id { get; set; }
 
 		public required string Name { get; set; } = null!;
 
@@ -10,7 +10,7 @@
 
 		public string? Phone { get; set; }
 
-		public long UserId { get; set; }
+		public Guid UserId { get; set; }
 		public User User { get; set; } = null!;
 	}
 }
