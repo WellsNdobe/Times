@@ -12,8 +12,8 @@ using Times.Database;
 namespace Times.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20260117154546_AddOrganizations")]
-    partial class AddOrganizations
+    [Migration("20260118165335_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -37,6 +37,9 @@ namespace Times.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Phone")
                         .HasColumnType("nvarchar(max)");
@@ -108,6 +111,46 @@ namespace Times.Migrations
                     b.ToTable("OrganizationMembers");
                 });
 
+            modelBuilder.Entity("Times.Entities.Project", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.ToTable("Projects");
+                });
+
             modelBuilder.Entity("Times.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -173,6 +216,23 @@ namespace Times.Migrations
                     b.Navigation("Organization");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Times.Entities.Project", b =>
+                {
+                    b.HasOne("Times.Entities.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId");
+
+                    b.HasOne("Times.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+
+                    b.Navigation("Organization");
                 });
 
             modelBuilder.Entity("Times.Entities.Organization", b =>

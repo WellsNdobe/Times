@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Times.Dto.OrganizationMembers;
 using Times.Dto.Organizations;
 using Times.Entities;
-
 namespace Times.Services.Contracts
 {
 	public interface IOrganizationService

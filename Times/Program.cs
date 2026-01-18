@@ -42,6 +42,7 @@ builder.Services.AddDbContext<DataContext>(options =>
 );
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
+builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddOpenApi();
 
 
@@ -65,7 +66,6 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
-
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
