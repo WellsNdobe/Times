@@ -8,6 +8,7 @@ using Times.Dto.OrganizationMembers;
 using Times.Dto.Organizations;
 using Times.Entities;
 using Times.Services.Contracts;
+using Times.Services.Errors; // <-- add this
 
 namespace Times.Services.Implementation
 {
@@ -22,15 +23,26 @@ namespace Times.Services.Implementation
 
 		public async Task<OrganizationResponse> CreateAsync(Guid actorUserId, CreateOrganizationRequest request)
 		{
-			if (string.IsNullOrWhiteSpace(request.Name))
-				throw new ArgumentException("Organization name is required.");
+			var name = (request.Name ?? string.Empty).Trim();
+			if (string.IsNullOrWhiteSpace(name))
+				throw new ValidationException("Organization name is required.", new Dictionary<string, string[]>
+				{
+					["name"] = new[] { "Organization name is required." }
+				});
+
+			// Optional but recommended: unique org name per system / per owner / per tenant.
+			// If you enforce it in DB, keep this as a friendly pre-check.
+			// var nameExists = await _db.Organizations.AsNoTracking().AnyAsync(o => o.Name == name);
+			// if (nameExists) throw new ConflictException("An organization with this name already exists.");
+
+			var now = DateTime.UtcNow;
 
 			var org = new Organization
 			{
-				Name = request.Name.Trim(),
+				Name = name,
 				IsActive = true,
-				CreatedAtUtc = DateTime.UtcNow,
-				UpdatedAtUtc = DateTime.UtcNow
+				CreatedAtUtc = now,
+				UpdatedAtUtc = now
 			};
 
 			var membership = new OrganizationMember
@@ -39,20 +51,29 @@ namespace Times.Services.Implementation
 				UserId = actorUserId,
 				Role = OrganizationRole.Admin,
 				IsActive = true,
-				CreatedAtUtc = DateTime.UtcNow,
-				UpdatedAtUtc = DateTime.UtcNow
+				CreatedAtUtc = now,
+				UpdatedAtUtc = now
 			};
 
 			_db.Organizations.Add(org);
 			_db.OrganizationMembers.Add(membership);
 
-			await _db.SaveChangesAsync();
+			try
+			{
+				await _db.SaveChangesAsync();
+			}
+			catch (DbUpdateException ex)
+			{
+				// If you add unique constraints later, convert races to a clean 409 instead of 500.
+				throw new ConflictException("Organization could not be created due to a conflict.", ex);
+			}
 
 			return Map(org);
 		}
 
 		public async Task<List<OrganizationResponse>> GetMyOrganizationsAsync(Guid actorUserId)
 		{
+			// This one is naturally "empty list is fine"—not having orgs isn't an error.
 			var orgs = await _db.OrganizationMembers
 				.AsNoTracking()
 				.Where(m => m.UserId == actorUserId && m.IsActive)
@@ -64,46 +85,75 @@ namespace Times.Services.Implementation
 			return orgs.Select(Map).ToList();
 		}
 
-		public async Task<OrganizationResponse?> GetByIdAsync(Guid actorUserId, Guid organizationId)
+		public async Task<OrganizationResponse> GetByIdAsync(Guid actorUserId, Guid organizationId)
 		{
+			// Membership is authorization. Decide if you want to hide existence:
+			// - Security-hiding: return NotFound if not member
+			// - Clearer: Forbidden if not member
+			// I’ll go with Forbidden here for consistency with your ProjectService cleanup.
 			var isMember = await _db.OrganizationMembers
 				.AsNoTracking()
 				.AnyAsync(m => m.OrganizationId == organizationId && m.UserId == actorUserId && m.IsActive);
 
-			if (!isMember) return null;
+			if (!isMember) throw new ForbiddenException("You are not a member of this organization.");
 
 			var org = await _db.Organizations
 				.AsNoTracking()
 				.FirstOrDefaultAsync(o => o.Id == organizationId);
 
-			return org is null ? null : Map(org);
+			if (org is null) throw new NotFoundException("Organization not found.");
+
+			return Map(org);
 		}
 
-		public async Task<OrganizationResponse?> UpdateAsync(Guid actorUserId, Guid organizationId, UpdateOrganizationRequest request)
+		public async Task<OrganizationResponse> UpdateAsync(Guid actorUserId, Guid organizationId, UpdateOrganizationRequest request)
 		{
 			// Only Admin can update org details
 			var isAdmin = await IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin);
-			if (!isAdmin) return null;
+			if (!isAdmin) throw new ForbiddenException("Only Admin can update organization details.");
 
 			var org = await _db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId);
-			if (org is null) return null;
+			if (org is null) throw new NotFoundException("Organization not found.");
 
-			if (!string.IsNullOrWhiteSpace(request.Name))
-				org.Name = request.Name.Trim();
+			if (request.Name != null)
+			{
+				var name = request.Name.Trim();
+				if (string.IsNullOrWhiteSpace(name))
+					throw new ValidationException("Organization name cannot be empty.", new Dictionary<string, string[]>
+					{
+						["name"] = new[] { "Organization name cannot be empty." }
+					});
+
+				org.Name = name;
+			}
 
 			if (request.IsActive.HasValue)
 				org.IsActive = request.IsActive.Value;
 
 			org.UpdatedAtUtc = DateTime.UtcNow;
 
-			await _db.SaveChangesAsync();
+			try
+			{
+				await _db.SaveChangesAsync();
+			}
+			catch (DbUpdateException ex)
+			{
+				throw new ConflictException("Organization update could not be saved due to a conflict.", ex);
+			}
+
 			return Map(org);
 		}
 
 		public async Task<List<OrganizationMemberResponse>> GetMembersAsync(Guid actorUserId, Guid organizationId)
 		{
 			var canView = await IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin, OrganizationRole.Manager);
-			if (!canView) return new List<OrganizationMemberResponse>();
+			if (!canView) throw new ForbiddenException("Only Admin/Manager can view organization members.");
+
+			// Optional: if you want a cleaner error when org doesn't exist
+			// you can check existence here and throw NotFoundException.
+			// (But it does add an extra query.)
+			// var orgExists = await _db.Organizations.AsNoTracking().AnyAsync(o => o.Id == organizationId);
+			// if (!orgExists) throw new NotFoundException("Organization not found.");
 
 			var members = await _db.OrganizationMembers
 				.AsNoTracking()
@@ -118,18 +168,39 @@ namespace Times.Services.Implementation
 		public async Task<OrganizationMemberResponse> AddMemberAsync(Guid actorUserId, Guid organizationId, AddMemberRequest request)
 		{
 			var isAdmin = await IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin);
-			if (!isAdmin) throw new UnauthorizedAccessException("Only Admin can add members.");
+			if (!isAdmin) throw new ForbiddenException("Only Admin can add members.");
 
-			// prevent duplicates
+			if (request.UserId == Guid.Empty)
+				throw new ValidationException("UserId is required.", new Dictionary<string, string[]>
+				{
+					["userId"] = new[] { "UserId is required." }
+				});
+
+			// Optional guard: ensure org exists (otherwise you get a foreign key fail later)
+			var orgExists = await _db.Organizations.AsNoTracking().AnyAsync(o => o.Id == organizationId);
+			if (!orgExists) throw new NotFoundException("Organization not found.");
+
+			// prevent duplicates: if exists, re-activate / update role
 			var existing = await _db.OrganizationMembers
 				.FirstOrDefaultAsync(m => m.OrganizationId == organizationId && m.UserId == request.UserId);
+
+			var now = DateTime.UtcNow;
 
 			if (existing != null)
 			{
 				existing.Role = request.Role;
 				existing.IsActive = true;
-				existing.UpdatedAtUtc = DateTime.UtcNow;
-				await _db.SaveChangesAsync();
+				existing.UpdatedAtUtc = now;
+
+				try
+				{
+					await _db.SaveChangesAsync();
+				}
+				catch (DbUpdateException ex)
+				{
+					throw new ConflictException("Member could not be updated due to a conflict.", ex);
+				}
+
 				return Map(existing);
 			}
 
@@ -139,25 +210,33 @@ namespace Times.Services.Implementation
 				UserId = request.UserId,
 				Role = request.Role,
 				IsActive = true,
-				CreatedAtUtc = DateTime.UtcNow,
-				UpdatedAtUtc = DateTime.UtcNow
+				CreatedAtUtc = now,
+				UpdatedAtUtc = now
 			};
 
 			_db.OrganizationMembers.Add(member);
-			await _db.SaveChangesAsync();
+
+			try
+			{
+				await _db.SaveChangesAsync();
+			}
+			catch (DbUpdateException ex)
+			{
+				throw new ConflictException("Member could not be added due to a conflict.", ex);
+			}
 
 			return Map(member);
 		}
 
-		public async Task<OrganizationMemberResponse?> UpdateMemberAsync(Guid actorUserId, Guid organizationId, Guid memberId, UpdateMemberRequest request)
+		public async Task<OrganizationMemberResponse> UpdateMemberAsync(Guid actorUserId, Guid organizationId, Guid memberId, UpdateMemberRequest request)
 		{
 			var isAdmin = await IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin);
-			if (!isAdmin) return null;
+			if (!isAdmin) throw new ForbiddenException("Only Admin can update members.");
 
 			var member = await _db.OrganizationMembers
 				.FirstOrDefaultAsync(m => m.Id == memberId && m.OrganizationId == organizationId);
 
-			if (member is null) return null;
+			if (member is null) throw new NotFoundException("Organization member not found.");
 
 			if (request.Role.HasValue)
 				member.Role = request.Role.Value;
@@ -167,12 +246,21 @@ namespace Times.Services.Implementation
 
 			member.UpdatedAtUtc = DateTime.UtcNow;
 
-			await _db.SaveChangesAsync();
+			try
+			{
+				await _db.SaveChangesAsync();
+			}
+			catch (DbUpdateException ex)
+			{
+				throw new ConflictException("Member update could not be saved due to a conflict.", ex);
+			}
+
 			return Map(member);
 		}
 
 		public async Task<OrganizationMember?> GetMembershipAsync(Guid actorUserId, Guid organizationId)
 		{
+			// This stays nullable because it's used as a helper/lookup.
 			return await _db.OrganizationMembers
 				.AsNoTracking()
 				.FirstOrDefaultAsync(m =>

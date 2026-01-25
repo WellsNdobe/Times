@@ -2,17 +2,12 @@
 
 namespace Times.Services.Contracts
 {
-    public interface IClientService
-    {
-		IReadOnlyList<ClientResponse> GetMyClients(Guid userId);
-
-		ClientResponse CreateClient(Guid userId, CreateClientRequest request);
-
-		void DeleteClient(Guid userId, Guid clientId);
-
-		ClientResponse GetClientById(Guid userId, Guid clientId);
-
-		ClientResponse UpdateClient(Guid userId, Guid clientId, UpdateClientRequest request);
-
+	public interface IClientService
+	{
+		Task<IReadOnlyList<ClientResponse>> ListAsync(Guid actorUserId, Guid organizationId);
+		Task<ClientResponse> CreateAsync(Guid actorUserId, Guid organizationId, CreateClientRequest request);
+		Task<ClientResponse> GetByIdAsync(Guid actorUserId, Guid organizationId, Guid clientId);
+		Task<ClientResponse> UpdateAsync(Guid actorUserId, Guid organizationId, Guid clientId, UpdateClientRequest request);
+		Task DeleteAsync(Guid actorUserId, Guid organizationId, Guid clientId);
 	}
 }

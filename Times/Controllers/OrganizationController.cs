@@ -49,23 +49,22 @@ namespace Times.Controllers
 		{
 			var actorUserId = GetUserId();
 			var org = await _orgs.GetByIdAsync(actorUserId, organizationId);
-			return org is null ? NotFound() : Ok(org);
+			return Ok(org);
 		}
+
 
 		[HttpPatch("{organizationId:guid}")]
 		public async Task<IActionResult> Update([FromRoute] Guid organizationId, [FromBody] UpdateOrganizationRequest request)
 		{
 			var actorUserId = GetUserId();
 			var updated = await _orgs.UpdateAsync(actorUserId, organizationId, request);
-			return updated is null ? Forbid() : Ok(updated);
+			return Ok(updated);
 		}
-
 		[HttpGet("{organizationId:guid}/members")]
 		public async Task<IActionResult> Members([FromRoute] Guid organizationId)
 		{
 			var actorUserId = GetUserId();
 			var members = await _orgs.GetMembersAsync(actorUserId, organizationId);
-			// If not allowed, service returns empty list; you may prefer Forbid()
 			return Ok(members);
 		}
 
@@ -82,7 +81,7 @@ namespace Times.Controllers
 		{
 			var actorUserId = GetUserId();
 			var updated = await _orgs.UpdateMemberAsync(actorUserId, organizationId, memberId, request);
-			return updated is null ? Forbid() : Ok(updated);
+			return Ok(updated);
 		}
 	}
 }

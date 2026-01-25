@@ -1,13 +1,16 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Times.Database;
 using Times.Infrastructure.Auth;
 using Times.Infrastructure.Persistence;
+using Times.Middleware;
 using Times.Services.Contracts;
 using Times.Services.Implementation;
+
 
 
 
@@ -67,6 +70,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 app.UseHttpsRedirection();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseAuthorization();
 

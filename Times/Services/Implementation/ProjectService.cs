@@ -8,7 +8,8 @@ using Times.Database;
 using Times.Dto.Projects;
 using Times.Entities;
 using Times.Services.Contracts;
-using Times.Services.Errors; // <-- new namespace for custom exceptions
+using Times.Services.Errors;
+using ValidationException = Times.Services.Errors.ValidationException; // <-- new namespace for custom exceptions
 
 namespace Times.Services.Implementation
 {
