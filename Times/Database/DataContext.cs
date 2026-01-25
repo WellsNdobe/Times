@@ -1,18 +1,14 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Times.Entities;
+
 namespace Times.Database
-
 {
-    public class DataContext : DbContext
-    {
-		
-		
-			public DataContext(DbContextOptions<DataContext> options)
-				: base(options)
-			{
-			}
-		
-
+	public class DataContext : DbContext
+	{
+		public DataContext(DbContextOptions<DataContext> options)
+			: base(options)
+		{
+		}
 
 		public DbSet<User> Users => Set<User>();
 		public DbSet<Client> Clients => Set<Client>();
@@ -21,6 +17,76 @@ namespace Times.Database
 
 		public DbSet<Project> Projects => Set<Project>();
 
+		public DbSet<Timesheet> Timesheets => Set<Timesheet>();
+		public DbSet<TimesheetEntry> TimesheetEntries => Set<TimesheetEntry>();
 
+		protected override void OnModelCreating(ModelBuilder modelBuilder)
+		{
+			base.OnModelCreating(modelBuilder);
+
+			// ---- Timesheet ----
+			modelBuilder.Entity<Timesheet>(b =>
+			{
+				b.HasKey(x => x.Id);
+
+				b.Property(x => x.Status).IsRequired();
+
+				b.Property(x => x.SubmissionComment).HasMaxLength(2000);
+				b.Property(x => x.RejectionReason).HasMaxLength(2000);
+
+				// One timesheet per user per org per week
+				b.HasIndex(x => new { x.OrganizationId, x.UserId, x.WeekStartDate }).IsUnique();
+
+				// Timesheet owns entries; deleting a timesheet deletes its entries
+				b.HasMany(x => x.Entries)
+					.WithOne(e => e.Timesheet)
+					.HasForeignKey(e => e.TimesheetId)
+					.OnDelete(DeleteBehavior.Cascade);
+
+				b.HasOne(x => x.Organization)
+					.WithMany()
+					.HasForeignKey(x => x.OrganizationId)
+					.OnDelete(DeleteBehavior.Cascade);
+
+				b.HasOne(x => x.User)
+					.WithMany()
+					.HasForeignKey(x => x.UserId)
+					.OnDelete(DeleteBehavior.Cascade);
+
+				// IMPORTANT: avoid multiple cascade paths (Timesheet -> User and Timesheet -> ApprovedByUser)
+				b.HasOne(x => x.ApprovedByUser)
+					.WithMany()
+					.HasForeignKey(x => x.ApprovedByUserId)
+					.OnDelete(DeleteBehavior.NoAction);
+			});
+
+			// ---- TimesheetEntry ----
+			modelBuilder.Entity<TimesheetEntry>(b =>
+			{
+				b.HasKey(x => x.Id);
+
+				b.Property(x => x.DurationMinutes).IsRequired();
+				b.Property(x => x.Notes).HasMaxLength(2000);
+
+				b.HasIndex(x => new { x.OrganizationId, x.TimesheetId });
+				b.HasIndex(x => new { x.OrganizationId, x.ProjectId });
+				b.HasIndex(x => new { x.OrganizationId, x.WorkDate });
+
+				// FK to Timesheet already configured via Timesheet.HasMany(...)
+
+				// IMPORTANT: This fixes your SQL Server Error 1785
+				// Do NOT cascade delete entries via Project, or you create multiple cascade paths.
+				b.HasOne(x => x.Project)
+					.WithMany()
+					.HasForeignKey(x => x.ProjectId)
+					.OnDelete(DeleteBehavior.NoAction);
+
+				// Optional but recommended: avoid org -> entries cascade path too
+				b.HasOne(x => x.Organization)
+					.WithMany()
+					.HasForeignKey(x => x.OrganizationId)
+					.OnDelete(DeleteBehavior.NoAction);
+			});
+		}
 	}
 }
