@@ -1,24 +1,29 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mail;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Times.Database;
 using Times.Dto.OrganizationMembers;
 using Times.Dto.Organizations;
 using Times.Entities;
 using Times.Services.Contracts;
-using Times.Services.Errors; // <-- add this
+using Times.Services.Errors;
 
 namespace Times.Services.Implementation
 {
 	public class OrganizationService : IOrganizationService
 	{
+		private const int MinPasswordLength = 6;
 		private readonly DataContext _db;
+		private readonly PasswordHasher<User> _passwordHasher;
 
 		public OrganizationService(DataContext db)
 		{
 			_db = db;
+			_passwordHasher = new PasswordHasher<User>();
 		}
 
 		public async Task<OrganizationResponse> CreateAsync(Guid actorUserId, CreateOrganizationRequest request)
@@ -228,6 +233,84 @@ namespace Times.Services.Implementation
 			return Map(member);
 		}
 
+		public async Task<OrganizationMemberResponse> CreateUserInOrganizationAsync(Guid actorUserId, Guid organizationId, CreateOrganizationUserRequest request)
+		{
+			var isAdmin = await IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin);
+			if (!isAdmin) throw new ForbiddenException("Only Admin can create users in the organization.");
+
+			var errors = ValidateCreateOrganizationUserRequest(request);
+			if (errors.Count > 0)
+				throw new ValidationException("Validation failed.", errors);
+
+			var orgExists = await _db.Organizations.AsNoTracking().AnyAsync(o => o.Id == organizationId);
+			if (!orgExists) throw new NotFoundException("Organization not found.");
+
+			var email = (request.Email ?? string.Empty).Trim().ToLowerInvariant();
+			var existingUser = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Email.ToLower() == email);
+
+			var now = DateTime.UtcNow;
+			User user;
+			if (existingUser != null)
+			{
+				user = await _db.Users.FirstAsync(u => u.Id == existingUser.Id);
+				// Add existing user to org (same as AddMember)
+				var existingMember = await _db.OrganizationMembers
+					.FirstOrDefaultAsync(m => m.OrganizationId == organizationId && m.UserId == user.Id);
+				if (existingMember != null)
+				{
+					existingMember.Role = request.Role;
+					existingMember.IsActive = true;
+					existingMember.UpdatedAtUtc = now;
+					await _db.SaveChangesAsync();
+					return Map(existingMember);
+				}
+				var member = new OrganizationMember
+				{
+					OrganizationId = organizationId,
+					UserId = user.Id,
+					Role = request.Role,
+					IsActive = true,
+					CreatedAtUtc = now,
+					UpdatedAtUtc = now
+				};
+				_db.OrganizationMembers.Add(member);
+				await _db.SaveChangesAsync();
+				return Map(member);
+			}
+
+			// Create new user and add to org
+			user = new User
+			{
+				Id = Guid.NewGuid(),
+				Email = request.Email!.Trim(),
+				FirstName = (request.FirstName ?? string.Empty).Trim(),
+				LastName = (request.LastName ?? string.Empty).Trim(),
+				IsActive = true,
+				CreatedAt = now
+			};
+			user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
+			var newMember = new OrganizationMember
+			{
+				OrganizationId = organizationId,
+				UserId = user.Id,
+				Role = request.Role,
+				IsActive = true,
+				CreatedAtUtc = now,
+				UpdatedAtUtc = now
+			};
+			_db.Users.Add(user);
+			_db.OrganizationMembers.Add(newMember);
+			try
+			{
+				await _db.SaveChangesAsync();
+			}
+			catch (DbUpdateException ex)
+			{
+				throw new ConflictException("User could not be created or added due to a conflict.", ex);
+			}
+			return Map(newMember);
+		}
+
 		public async Task<OrganizationMemberResponse> UpdateMemberAsync(Guid actorUserId, Guid organizationId, Guid memberId, UpdateMemberRequest request)
 		{
 			var isAdmin = await IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin);
@@ -299,5 +382,30 @@ namespace Times.Services.Implementation
 			CreatedAtUtc = m.CreatedAtUtc,
 			UpdatedAtUtc = m.UpdatedAtUtc
 		};
+
+		private static Dictionary<string, string[]> ValidateCreateOrganizationUserRequest(CreateOrganizationUserRequest request)
+		{
+			var errors = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+			if (string.IsNullOrWhiteSpace(request.Email))
+				AddError(errors, "email", "Email is required.");
+			else if (!MailAddress.TryCreate(request.Email, out _))
+				AddError(errors, "email", "Email format is invalid.");
+			if (string.IsNullOrWhiteSpace(request.Password))
+				AddError(errors, "password", "Password is required.");
+			else if (request.Password.Length < MinPasswordLength)
+				AddError(errors, "password", $"Password must be at least {MinPasswordLength} characters.");
+			if (string.IsNullOrWhiteSpace(request.FirstName))
+				AddError(errors, "firstName", "First name is required.");
+			if (string.IsNullOrWhiteSpace(request.LastName))
+				AddError(errors, "lastName", "Last name is required.");
+			return errors;
+		}
+
+		private static void AddError(Dictionary<string, string[]> errors, string key, string message)
+		{
+			errors[key] = errors.TryGetValue(key, out var existing)
+				? existing.Append(message).ToArray()
+				: new[] { message };
+		}
 	}
 }

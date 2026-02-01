@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Times.Entities;
 
 namespace Times.Database
@@ -16,6 +16,7 @@ namespace Times.Database
 		public DbSet<Organization> Organizations => Set<Organization>();
 
 		public DbSet<Project> Projects => Set<Project>();
+		public DbSet<ProjectAssignment> ProjectAssignments => Set<ProjectAssignment>();
 
 		public DbSet<Timesheet> Timesheets => Set<Timesheet>();
 		public DbSet<TimesheetEntry> TimesheetEntries => Set<TimesheetEntry>();
@@ -23,6 +24,29 @@ namespace Times.Database
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{
 			base.OnModelCreating(modelBuilder);
+
+			// ---- ProjectAssignment ----
+			modelBuilder.Entity<ProjectAssignment>(b =>
+			{
+				b.HasKey(x => x.Id);
+				b.HasIndex(x => new { x.ProjectId, x.UserId }).IsUnique();
+				b.HasOne(x => x.Organization)
+					.WithMany()
+					.HasForeignKey(x => x.OrganizationId)
+					.OnDelete(DeleteBehavior.NoAction);
+				b.HasOne(x => x.Project)
+					.WithMany()
+					.HasForeignKey(x => x.ProjectId)
+					.OnDelete(DeleteBehavior.Cascade);
+				b.HasOne(x => x.User)
+					.WithMany()
+					.HasForeignKey(x => x.UserId)
+					.OnDelete(DeleteBehavior.Cascade);
+				b.HasOne(x => x.AssignedByUser)
+					.WithMany()
+					.HasForeignKey(x => x.AssignedByUserId)
+					.OnDelete(DeleteBehavior.NoAction);
+			});
 
 			// ---- Timesheet ----
 			modelBuilder.Entity<Timesheet>(b =>

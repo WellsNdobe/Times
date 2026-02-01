@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -20,6 +21,7 @@ var builder = WebApplication.CreateBuilder(args);
 //Add Services
 builder.Services.AddControllers();
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddSingleton<IRevokedTokenStore, RevokedTokenStore>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 	.AddJwtBearer(options =>
 	{
@@ -35,6 +37,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 				Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
 			)
 		};
+		options.Events = new JwtBearerEvents
+		{
+			OnTokenValidated = async ctx =>
+			{
+				var store = ctx.HttpContext.RequestServices.GetRequiredService<IRevokedTokenStore>();
+				var jti = ctx.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+				if (!string.IsNullOrEmpty(jti) && await store.IsRevokedAsync(jti))
+					ctx.Fail("Token has been revoked (logged out).");
+			}
+		};
 	});
 
 builder.Services.AddAuthorization();
@@ -46,6 +58,8 @@ builder.Services.AddDbContext<DataContext>(options =>
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<ITimesheetService, TimesheetService>();
+builder.Services.AddScoped<ITimesheetEntryService, TimesheetEntryService>();
 builder.Services.AddOpenApi();
 
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Times.Dto.OrganizationMembers;
@@ -15,6 +15,11 @@ namespace Times.Services.Contracts
 
 		Task<List<OrganizationMemberResponse>> GetMembersAsync(Guid actorUserId, Guid organizationId);
 		Task<OrganizationMemberResponse> AddMemberAsync(Guid actorUserId, Guid organizationId, AddMemberRequest request);
+		/// <summary>
+		/// Creates a new user (if email not registered) and adds them to the organization, or adds existing user to the org.
+		/// Admin only.
+		/// </summary>
+		Task<OrganizationMemberResponse> CreateUserInOrganizationAsync(Guid actorUserId, Guid organizationId, CreateOrganizationUserRequest request);
 		Task<OrganizationMemberResponse> UpdateMemberAsync(Guid actorUserId, Guid organizationId, Guid memberId, UpdateMemberRequest request);
 
 		Task<OrganizationMember?> GetMembershipAsync(Guid actorUserId, Guid organizationId);

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -74,6 +74,17 @@ namespace Times.Controllers
 			var actorUserId = GetUserId();
 			var added = await _orgs.AddMemberAsync(actorUserId, organizationId, request);
 			return Ok(added);
+		}
+
+		/// <summary>
+		/// Admin only: create a new user and add them to the organization, or add an existing user (by email) to the org.
+		/// </summary>
+		[HttpPost("{organizationId:guid}/members/create-user")]
+		public async Task<IActionResult> CreateUserInOrganization([FromRoute] Guid organizationId, [FromBody] CreateOrganizationUserRequest request)
+		{
+			var actorUserId = GetUserId();
+			var result = await _orgs.CreateUserInOrganizationAsync(actorUserId, organizationId, request);
+			return Ok(result);
 		}
 
 		[HttpPatch("{organizationId:guid}/members/{memberId:guid}")]

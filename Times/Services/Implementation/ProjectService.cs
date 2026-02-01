@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -201,6 +201,90 @@ namespace Times.Services.Implementation
 
 			return Map(project);
 		}
+
+		public async Task<ProjectAssignmentResponse> AssignUserAsync(Guid actorUserId, Guid organizationId, Guid projectId, AssignUserToProjectRequest request)
+		{
+			var canAssign = await _orgs.IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin, OrganizationRole.Manager);
+			if (!canAssign) throw new ForbiddenException("Only Admin/Manager can assign users to projects.");
+
+			if (request.UserId == Guid.Empty)
+				throw new ValidationException("UserId is required.", new Dictionary<string, string[]>
+				{
+					["userId"] = new[] { "UserId is required." }
+				});
+
+			var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.OrganizationId == organizationId);
+			if (project is null) throw new NotFoundException("Project not found.");
+
+			var userIsMember = await _db.OrganizationMembers.AsNoTracking()
+				.AnyAsync(m => m.OrganizationId == organizationId && m.UserId == request.UserId && m.IsActive);
+			if (!userIsMember) throw new ValidationException("User is not a member of this organization.", new Dictionary<string, string[]>
+			{
+				["userId"] = new[] { "User must be a member of the organization." }
+			});
+
+			var existing = await _db.ProjectAssignments.FirstOrDefaultAsync(a => a.ProjectId == projectId && a.UserId == request.UserId);
+			if (existing != null) return MapAssignment(existing);
+
+			var assignment = new ProjectAssignment
+			{
+				OrganizationId = organizationId,
+				ProjectId = projectId,
+				UserId = request.UserId,
+				AssignedByUserId = actorUserId,
+				AssignedAtUtc = DateTime.UtcNow
+			};
+			_db.ProjectAssignments.Add(assignment);
+			try
+			{
+				await _db.SaveChangesAsync();
+			}
+			catch (DbUpdateException ex)
+			{
+				throw new ConflictException("Assignment could not be saved due to a conflict.", ex);
+			}
+			return MapAssignment(assignment);
+		}
+
+		public async Task UnassignUserAsync(Guid actorUserId, Guid organizationId, Guid projectId, Guid userId)
+		{
+			var canUnassign = await _orgs.IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin, OrganizationRole.Manager);
+			if (!canUnassign) throw new ForbiddenException("Only Admin/Manager can unassign users from projects.");
+
+			var projectExists = await _db.Projects.AsNoTracking().AnyAsync(p => p.Id == projectId && p.OrganizationId == organizationId);
+			if (!projectExists) throw new NotFoundException("Project not found.");
+
+			var assignment = await _db.ProjectAssignments.FirstOrDefaultAsync(a => a.ProjectId == projectId && a.UserId == userId);
+			if (assignment is null) throw new NotFoundException("Assignment not found.");
+
+			_db.ProjectAssignments.Remove(assignment);
+			await _db.SaveChangesAsync();
+		}
+
+		public async Task<List<ProjectAssignmentResponse>> GetProjectAssignmentsAsync(Guid actorUserId, Guid organizationId, Guid projectId)
+		{
+			var membership = await _orgs.GetMembershipAsync(actorUserId, organizationId);
+			if (membership is null) throw new ForbiddenException("You are not a member of this organization.");
+
+			var projectExists = await _db.Projects.AsNoTracking().AnyAsync(p => p.Id == projectId && p.OrganizationId == organizationId);
+			if (!projectExists) throw new NotFoundException("Project not found.");
+
+			var assignments = await _db.ProjectAssignments
+				.AsNoTracking()
+				.Where(a => a.ProjectId == projectId)
+				.OrderBy(a => a.AssignedAtUtc)
+				.ToListAsync();
+			return assignments.Select(MapAssignment).ToList();
+		}
+
+		private static ProjectAssignmentResponse MapAssignment(ProjectAssignment a) => new ProjectAssignmentResponse
+		{
+			Id = a.Id,
+			ProjectId = a.ProjectId,
+			UserId = a.UserId,
+			AssignedByUserId = a.AssignedByUserId,
+			AssignedAtUtc = a.AssignedAtUtc
+		};
 
 		private static string? NormalizeOptional(string? value)
 			=> string.IsNullOrWhiteSpace(value) ? null : value.Trim();

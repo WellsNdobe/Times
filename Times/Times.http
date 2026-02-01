@@ -1,5 +1,41 @@
 @Times_HostAddress = http://localhost:5275
+@token = 
 
+### Login (returns token; use for Authorization header)
+# POST {{Times_HostAddress}}/api/auth/login
+# Content-Type: application/json
+# { "email": "admin@example.com", "password": "Admin123!" }
+
+### Logout (requires valid token; revokes current token)
+POST {{Times_HostAddress}}/api/auth/logout
+Authorization: Bearer {{token}}
+
+### Register (validation errors return 400 with "errors" object)
+# POST {{Times_HostAddress}}/api/auth/register
+# Content-Type: application/json
+# { "email": "user@example.com", "password": "secret", "firstName": "Jane", "lastName": "Doe" }
+
+### Admin: Create new user in organization (or add existing user by email)
+# POST {{Times_HostAddress}}/api/v1/organizations/{{organizationId}}/members/create-user
+# Authorization: Bearer {{token}}
+# Content-Type: application/json
+# { "email": "newuser@example.com", "password": "secret", "firstName": "New", "lastName": "User", "role": 2 }
+
+### Manager/Admin: Assign user to project
+# POST {{Times_HostAddress}}/api/v1/organizations/{{organizationId}}/projects/{{projectId}}/assignments
+# Authorization: Bearer {{token}}
+# Content-Type: application/json
+# { "userId": "00000000-0000-0000-0000-000000000000" }
+
+### List users assigned to a project
+# GET {{Times_HostAddress}}/api/v1/organizations/{{organizationId}}/projects/{{projectId}}/assignments
+# Authorization: Bearer {{token}}
+
+### Manager/Admin: Unassign user from project
+# DELETE {{Times_HostAddress}}/api/v1/organizations/{{organizationId}}/projects/{{projectId}}/assignments/{{userId}}
+# Authorization: Bearer {{token}}
+
+###
 GET {{Times_HostAddress}}/weatherforecast/
 Accept: application/json
 

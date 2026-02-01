@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -63,6 +63,33 @@ namespace Times.Controllers
 			var actorUserId = GetUserId();
 			var updated = await _projects.UpdateAsync(actorUserId, organizationId, projectId, request);
 			return Ok(updated);
+		}
+
+		/// <summary>Manager/Admin: assign a user to this project.</summary>
+		[HttpPost("{projectId:guid}/assignments")]
+		public async Task<IActionResult> AssignUser([FromRoute] Guid organizationId, [FromRoute] Guid projectId, [FromBody] AssignUserToProjectRequest request)
+		{
+			var actorUserId = GetUserId();
+			var result = await _projects.AssignUserAsync(actorUserId, organizationId, projectId, request);
+			return Ok(result);
+		}
+
+		/// <summary>Manager/Admin: remove a user from this project.</summary>
+		[HttpDelete("{projectId:guid}/assignments/{userId:guid}")]
+		public async Task<IActionResult> UnassignUser([FromRoute] Guid organizationId, [FromRoute] Guid projectId, [FromRoute] Guid userId)
+		{
+			var actorUserId = GetUserId();
+			await _projects.UnassignUserAsync(actorUserId, organizationId, projectId, userId);
+			return NoContent();
+		}
+
+		/// <summary>List users assigned to this project.</summary>
+		[HttpGet("{projectId:guid}/assignments")]
+		public async Task<IActionResult> GetAssignments([FromRoute] Guid organizationId, [FromRoute] Guid projectId)
+		{
+			var actorUserId = GetUserId();
+			var assignments = await _projects.GetProjectAssignmentsAsync(actorUserId, organizationId, projectId);
+			return Ok(assignments);
 		}
 	}
 }
