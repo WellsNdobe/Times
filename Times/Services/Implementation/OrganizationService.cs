@@ -162,12 +162,13 @@ namespace Times.Services.Implementation
 
 			var members = await _db.OrganizationMembers
 				.AsNoTracking()
+				.Include(m => m.User)
 				.Where(m => m.OrganizationId == organizationId)
 				.OrderBy(m => m.Role)
 				.ThenBy(m => m.CreatedAtUtc)
 				.ToListAsync();
 
-			return members.Select(Map).ToList();
+			return members.Select(m => Map(m, m.User)).ToList();
 		}
 
 		public async Task<OrganizationMemberResponse> AddMemberAsync(Guid actorUserId, Guid organizationId, AddMemberRequest request)
@@ -206,7 +207,7 @@ namespace Times.Services.Implementation
 					throw new ConflictException("Member could not be updated due to a conflict.", ex);
 				}
 
-				return Map(existing);
+				return await MapWithUserAsync(existing);
 			}
 
 			var member = new OrganizationMember
@@ -230,7 +231,7 @@ namespace Times.Services.Implementation
 				throw new ConflictException("Member could not be added due to a conflict.", ex);
 			}
 
-			return Map(member);
+			return await MapWithUserAsync(member);
 		}
 
 		public async Task<OrganizationMemberResponse> CreateUserInOrganizationAsync(Guid actorUserId, Guid organizationId, CreateOrganizationUserRequest request)
@@ -262,7 +263,7 @@ namespace Times.Services.Implementation
 					existingMember.IsActive = true;
 					existingMember.UpdatedAtUtc = now;
 					await _db.SaveChangesAsync();
-					return Map(existingMember);
+					return Map(existingMember, user);
 				}
 				var member = new OrganizationMember
 				{
@@ -275,7 +276,7 @@ namespace Times.Services.Implementation
 				};
 				_db.OrganizationMembers.Add(member);
 				await _db.SaveChangesAsync();
-				return Map(member);
+				return Map(member, user);
 			}
 
 			// Create new user and add to org
@@ -308,7 +309,7 @@ namespace Times.Services.Implementation
 			{
 				throw new ConflictException("User could not be created or added due to a conflict.", ex);
 			}
-			return Map(newMember);
+			return Map(newMember, user);
 		}
 
 		public async Task<OrganizationMemberResponse> UpdateMemberAsync(Guid actorUserId, Guid organizationId, Guid memberId, UpdateMemberRequest request)
@@ -338,7 +339,7 @@ namespace Times.Services.Implementation
 				throw new ConflictException("Member update could not be saved due to a conflict.", ex);
 			}
 
-			return Map(member);
+			return await MapWithUserAsync(member);
 		}
 
 		public async Task<OrganizationMember?> GetMembershipAsync(Guid actorUserId, Guid organizationId)
@@ -372,16 +373,25 @@ namespace Times.Services.Implementation
 			UpdatedAtUtc = org.UpdatedAtUtc
 		};
 
-		private static OrganizationMemberResponse Map(OrganizationMember m) => new OrganizationMemberResponse
+		private static OrganizationMemberResponse Map(OrganizationMember m, User? user) => new OrganizationMemberResponse
 		{
 			Id = m.Id,
 			OrganizationId = m.OrganizationId,
 			UserId = m.UserId,
+			FirstName = user?.FirstName ?? string.Empty,
+			LastName = user?.LastName ?? string.Empty,
 			Role = m.Role,
 			IsActive = m.IsActive,
 			CreatedAtUtc = m.CreatedAtUtc,
 			UpdatedAtUtc = m.UpdatedAtUtc
 		};
+
+		private async Task<OrganizationMemberResponse> MapWithUserAsync(OrganizationMember member)
+		{
+			var user = member.User ?? await _db.Users.AsNoTracking()
+				.FirstOrDefaultAsync(u => u.Id == member.UserId);
+			return Map(member, user);
+		}
 
 		private static Dictionary<string, string[]> ValidateCreateOrganizationUserRequest(CreateOrganizationUserRequest request)
 		{

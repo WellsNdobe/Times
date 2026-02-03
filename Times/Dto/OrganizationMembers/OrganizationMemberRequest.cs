@@ -9,6 +9,8 @@ namespace Times.Dto.OrganizationMembers
 
 		public Guid OrganizationId { get; set; }
 		public Guid UserId { get; set; }
+		public string FirstName { get; set; } = string.Empty;
+		public string LastName { get; set; } = string.Empty;
 
 		public OrganizationRole Role { get; set; }
 		public bool IsActive { get; set; }
