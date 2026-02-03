@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -34,6 +34,18 @@ namespace Times.Controllers
 			var actorUserId = GetUserId();
 			var created = await _timesheets.CreateAsync(actorUserId, organizationId, request);
 			return CreatedAtAction(nameof(GetById), new { organizationId, timesheetId = created.Id }, created);
+		}
+
+		// Manager/Admin: list timesheets pending approval (Submitted status)
+		[HttpGet("pending-approval")]
+		public async Task<IActionResult> PendingApproval(
+			[FromRoute] Guid organizationId,
+			[FromQuery] DateOnly? fromWeekStart = null,
+			[FromQuery] DateOnly? toWeekStart = null)
+		{
+			var actorUserId = GetUserId();
+			var items = await _timesheets.ListPendingApprovalAsync(actorUserId, organizationId, fromWeekStart, toWeekStart);
+			return Ok(items);
 		}
 
 		// GET .../timesheets/mine?fromWeekStart=2026-01-05&toWeekStart=2026-02-02

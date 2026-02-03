@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Times.Entities;
 
 namespace Times.Dto.Timesheets
@@ -20,6 +20,7 @@ namespace Times.Dto.Timesheets
 
 		public DateTime? ApprovedAtUtc { get; set; }
 		public Guid? ApprovedByUserId { get; set; }
+		public string? ApprovedComment { get; set; }
 
 		public DateTime? RejectedAtUtc { get; set; }
 		public string? RejectionReason { get; set; }

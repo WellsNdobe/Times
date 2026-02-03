@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Times.Dto.Timesheets;
@@ -18,5 +18,10 @@ namespace Times.Services.Contracts
 		Task<TimesheetResponse?> ApproveAsync(Guid actorUserId, Guid organizationId, Guid timesheetId, ApproveTimesheetRequest request);
 
 		Task<TimesheetResponse?> RejectAsync(Guid actorUserId, Guid organizationId, Guid timesheetId, RejectTimesheetRequest request);
+
+		/// <summary>
+		/// Manager/Admin: list timesheets in Submitted status (pending approval) for the organization.
+		/// </summary>
+		Task<List<TimesheetResponse>> ListPendingApprovalAsync(Guid actorUserId, Guid organizationId, DateOnly? fromWeekStart = null, DateOnly? toWeekStart = null);
 	}
 }

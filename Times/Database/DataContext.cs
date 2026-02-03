@@ -56,6 +56,7 @@ namespace Times.Database
 				b.Property(x => x.Status).IsRequired();
 
 				b.Property(x => x.SubmissionComment).HasMaxLength(2000);
+				b.Property(x => x.ApprovedComment).HasMaxLength(2000);
 				b.Property(x => x.RejectionReason).HasMaxLength(2000);
 
 				// One timesheet per user per org per week

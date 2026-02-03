@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -159,9 +159,7 @@ namespace Times.Services.Implementation
 
 			// Lock on approval (MyHours-style)
 			ts.LockedAtUtc = now;
-
-			// Optional: store manager comment somewhere (you can add ApprovedComment field later)
-			// request.Comment
+			ts.ApprovedComment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
 
 			ts.UpdatedAtUtc = now;
 
@@ -201,6 +199,36 @@ namespace Times.Services.Implementation
 			return await BuildResponseAsync(timesheetId);
 		}
 
+		public async Task<List<TimesheetResponse>> ListPendingApprovalAsync(Guid actorUserId, Guid organizationId, DateOnly? fromWeekStart = null, DateOnly? toWeekStart = null)
+		{
+			var canView = await _orgs.IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin, OrganizationRole.Manager);
+			if (!canView) return new List<TimesheetResponse>();
+
+			var q = _db.Timesheets
+				.AsNoTracking()
+				.Where(t => t.OrganizationId == organizationId && t.Status == TimesheetStatus.Submitted);
+
+			if (fromWeekStart.HasValue)
+				q = q.Where(t => t.WeekStartDate >= NormalizeToWeekStart(fromWeekStart.Value));
+
+			if (toWeekStart.HasValue)
+				q = q.Where(t => t.WeekStartDate <= NormalizeToWeekStart(toWeekStart.Value));
+
+			var items = await q.OrderBy(t => t.WeekStartDate).ThenBy(t => t.SubmittedAtUtc).ToListAsync();
+			var ids = items.Select(x => x.Id).ToList();
+
+			var totals = await _db.TimesheetEntries
+				.AsNoTracking()
+				.Where(e => ids.Contains(e.TimesheetId) && !e.IsDeleted)
+				.GroupBy(e => e.TimesheetId)
+				.Select(g => new { TimesheetId = g.Key, TotalMinutes = g.Sum(x => x.DurationMinutes) })
+				.ToListAsync();
+
+			var totalsMap = totals.ToDictionary(x => x.TimesheetId, x => x.TotalMinutes);
+
+			return items.Select(t => Map(t, totalsMap.TryGetValue(t.Id, out var m) ? m : 0)).ToList();
+		}
+
 		// Helpers
 
 		private static DateOnly NormalizeToWeekStart(DateOnly date)
@@ -238,6 +266,7 @@ namespace Times.Services.Implementation
 			ApprovedByUserId = t.ApprovedByUserId,
 			RejectedAtUtc = t.RejectedAtUtc,
 			RejectionReason = t.RejectionReason,
+			ApprovedComment = t.ApprovedComment,
 			LockedAtUtc = t.LockedAtUtc,
 			TotalMinutes = totalMinutes,
 			TotalHours = Math.Round(totalMinutes / 60m, 2)
