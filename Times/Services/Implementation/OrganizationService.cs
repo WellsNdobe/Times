@@ -53,6 +53,7 @@ namespace Times.Services.Implementation
 			var membership = new OrganizationMember
 			{
 				Organization = org,
+				OrganizationId = org.Id,
 				UserId = actorUserId,
 				Role = OrganizationRole.Admin,
 				IsActive = true,
@@ -60,8 +61,14 @@ namespace Times.Services.Implementation
 				UpdatedAtUtc = now
 			};
 
+			var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == actorUserId);
+			if (user is null) throw new NotFoundException("User not found.");
+			if (!HasRole(user.Role, "Admin"))
+				user.Role = string.IsNullOrWhiteSpace(user.Role) ? "Admin" : $"{user.Role},Admin";
+
 			_db.Organizations.Add(org);
 			_db.OrganizationMembers.Add(membership);
+			org.Members.Add(membership);
 
 			try
 			{
@@ -372,6 +379,13 @@ namespace Times.Services.Implementation
 			CreatedAtUtc = org.CreatedAtUtc,
 			UpdatedAtUtc = org.UpdatedAtUtc
 		};
+
+		private static bool HasRole(string? roles, string role)
+		{
+			if (string.IsNullOrWhiteSpace(roles)) return false;
+			return roles.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+				.Any(r => string.Equals(r.Trim(), role, StringComparison.OrdinalIgnoreCase));
+		}
 
 		private static OrganizationMemberResponse Map(OrganizationMember m, User? user) => new OrganizationMemberResponse
 		{
