@@ -159,8 +159,6 @@ namespace Times.Services.Implementation
 
 			// Lock on approval (MyHours-style)
 			ts.LockedAtUtc = now;
-			ts.ApprovedComment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
-
 			ts.UpdatedAtUtc = now;
 
 			await _db.SaveChangesAsync();
@@ -266,7 +264,6 @@ namespace Times.Services.Implementation
 			ApprovedByUserId = t.ApprovedByUserId,
 			RejectedAtUtc = t.RejectedAtUtc,
 			RejectionReason = t.RejectionReason,
-			ApprovedComment = t.ApprovedComment,
 			LockedAtUtc = t.LockedAtUtc,
 			TotalMinutes = totalMinutes,
 			TotalHours = Math.Round(totalMinutes / 60m, 2)
