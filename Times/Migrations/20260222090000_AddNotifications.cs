@@ -1,10 +1,14 @@
 using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Times.Database;
 
 #nullable disable
 
 namespace Times.Migrations
 {
+	[DbContext(typeof(DataContext))]
+	[Migration("20260222090000_AddNotifications")]
 	public partial class AddNotifications : Migration
 	{
 		protected override void Up(MigrationBuilder migrationBuilder)

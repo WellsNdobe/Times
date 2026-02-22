@@ -27,7 +27,6 @@ namespace Times.Entities
 		public DateTime? ApprovedAtUtc { get; set; }
 		public Guid? ApprovedByUserId { get; set; }   // manager who approved/rejected
 		public User? ApprovedByUser { get; set; }
-		public string? ApprovedComment { get; set; }
 
 		public DateTime? RejectedAtUtc { get; set; }
 		public string? RejectionReason { get; set; }
