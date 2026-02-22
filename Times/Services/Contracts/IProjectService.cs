@@ -15,9 +15,9 @@ namespace Times.Services.Contracts
 			bool? isActive = null,
 			Guid? clientId = null);
 
-		Task<ProjectResponse?> GetByIdAsync(Guid actorUserId, Guid organizationId, Guid projectId);
+		Task<ProjectResponse> GetByIdAsync(Guid actorUserId, Guid organizationId, Guid projectId);
 
-		Task<ProjectResponse?> UpdateAsync(Guid actorUserId, Guid organizationId, Guid projectId, UpdateProjectRequest request);
+		Task<ProjectResponse> UpdateAsync(Guid actorUserId, Guid organizationId, Guid projectId, UpdateProjectRequest request);
 
 		/// <summary>Manager/Admin: assign a user to a project. User must be an org member.</summary>
 		Task<ProjectAssignmentResponse> AssignUserAsync(Guid actorUserId, Guid organizationId, Guid projectId, AssignUserToProjectRequest request);

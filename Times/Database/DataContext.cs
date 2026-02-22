@@ -20,6 +20,7 @@ namespace Times.Database
 
 		public DbSet<Timesheet> Timesheets => Set<Timesheet>();
 		public DbSet<TimesheetEntry> TimesheetEntries => Set<TimesheetEntry>();
+		public DbSet<Notification> Notifications => Set<Notification>();
 
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{
@@ -56,6 +57,7 @@ namespace Times.Database
 				b.Property(x => x.Status).IsRequired();
 
 				b.Property(x => x.SubmissionComment).HasMaxLength(2000);
+				b.Property(x => x.ApprovedComment).HasMaxLength(2000);
 				b.Property(x => x.RejectionReason).HasMaxLength(2000);
 
 				// One timesheet per user per org per week
@@ -109,6 +111,40 @@ namespace Times.Database
 				b.HasOne(x => x.Organization)
 					.WithMany()
 					.HasForeignKey(x => x.OrganizationId)
+					.OnDelete(DeleteBehavior.NoAction);
+			});
+
+			// ---- Notification ----
+			modelBuilder.Entity<Notification>(b =>
+			{
+				b.HasKey(x => x.Id);
+
+				b.Property(x => x.Type).IsRequired();
+				b.Property(x => x.Title).IsRequired().HasMaxLength(200);
+				b.Property(x => x.Message).IsRequired().HasMaxLength(2000);
+				b.Property(x => x.CreatedAtUtc).IsRequired();
+
+				b.HasIndex(x => new { x.OrganizationId, x.RecipientUserId, x.CreatedAtUtc });
+				b.HasIndex(x => new { x.RecipientUserId, x.ReadAtUtc });
+
+				b.HasOne(x => x.Organization)
+					.WithMany()
+					.HasForeignKey(x => x.OrganizationId)
+					.OnDelete(DeleteBehavior.NoAction);
+
+				b.HasOne(x => x.RecipientUser)
+					.WithMany()
+					.HasForeignKey(x => x.RecipientUserId)
+					.OnDelete(DeleteBehavior.NoAction);
+
+				b.HasOne(x => x.ActorUser)
+					.WithMany()
+					.HasForeignKey(x => x.ActorUserId)
+					.OnDelete(DeleteBehavior.NoAction);
+
+				b.HasOne(x => x.Timesheet)
+					.WithMany()
+					.HasForeignKey(x => x.TimesheetId)
 					.OnDelete(DeleteBehavior.NoAction);
 			});
 		}

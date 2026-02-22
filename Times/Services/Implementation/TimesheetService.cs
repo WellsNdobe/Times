@@ -14,11 +14,13 @@ namespace Times.Services.Implementation
 	{
 		private readonly DataContext _db;
 		private readonly IOrganizationService _orgs;
+		private readonly INotificationService _notifications;
 
-		public TimesheetService(DataContext db, IOrganizationService orgs)
+		public TimesheetService(DataContext db, IOrganizationService orgs, INotificationService notifications)
 		{
 			_db = db;
 			_orgs = orgs;
+			_notifications = notifications;
 		}
 
 		public async Task<TimesheetResponse> CreateAsync(Guid actorUserId, Guid organizationId, CreateTimesheetRequest request)
@@ -134,6 +136,36 @@ namespace Times.Services.Implementation
 			// ts.LockedAtUtc = now;
 
 			await _db.SaveChangesAsync();
+
+			var managerIds = await _db.OrganizationMembers
+				.AsNoTracking()
+				.Where(m => m.OrganizationId == organizationId
+							&& m.IsActive
+							&& (m.Role == OrganizationRole.Admin || m.Role == OrganizationRole.Manager))
+				.Select(m => m.UserId)
+				.ToListAsync();
+
+			managerIds = managerIds.Where(id => id != actorUserId).ToList();
+			if (managerIds.Count > 0)
+			{
+				var actorName = await GetUserDisplayNameAsync(actorUserId);
+				var weekLabel = ts.WeekStartDate.ToString("yyyy-MM-dd");
+				var title = "Timesheet submitted";
+				var message = string.IsNullOrWhiteSpace(actorName)
+					? $"A timesheet for week of {weekLabel} was submitted."
+					: $"{actorName} submitted a timesheet for week of {weekLabel}.";
+				title = Truncate(title, 200);
+				message = Truncate(message, 2000);
+				await _notifications.CreateTimesheetNotificationsAsync(
+					NotificationType.Submit,
+					actorUserId,
+					organizationId,
+					timesheetId,
+					managerIds,
+					title,
+					message);
+			}
+
 			return await BuildResponseAsync(timesheetId);
 		}
 
@@ -162,6 +194,25 @@ namespace Times.Services.Implementation
 			ts.UpdatedAtUtc = now;
 
 			await _db.SaveChangesAsync();
+
+			var weekLabel = ts.WeekStartDate.ToString("yyyy-MM-dd");
+			var actorName = await GetUserDisplayNameAsync(actorUserId);
+			var title = "Timesheet approved";
+			var message = string.IsNullOrWhiteSpace(actorName)
+				? $"Your timesheet for week of {weekLabel} was approved."
+				: $"{actorName} approved your timesheet for week of {weekLabel}.";
+			title = Truncate(title, 200);
+			message = Truncate(message, 2000);
+
+			await _notifications.CreateTimesheetNotificationAsync(
+				NotificationType.Approve,
+				actorUserId,
+				organizationId,
+				timesheetId,
+				ts.UserId,
+				title,
+				message);
+
 			return await BuildResponseAsync(timesheetId);
 		}
 
@@ -194,6 +245,26 @@ namespace Times.Services.Implementation
 			ts.UpdatedAtUtc = now;
 
 			await _db.SaveChangesAsync();
+
+			var weekLabel = ts.WeekStartDate.ToString("yyyy-MM-dd");
+			var actorName = await GetUserDisplayNameAsync(actorUserId);
+			var title = "Timesheet rejected";
+			var reason = string.IsNullOrWhiteSpace(ts.RejectionReason) ? "" : $" Reason: {ts.RejectionReason}";
+			var message = string.IsNullOrWhiteSpace(actorName)
+				? $"Your timesheet for week of {weekLabel} was rejected.{reason}"
+				: $"{actorName} rejected your timesheet for week of {weekLabel}.{reason}";
+			title = Truncate(title, 200);
+			message = Truncate(message, 2000);
+
+			await _notifications.CreateTimesheetNotificationAsync(
+				NotificationType.Reject,
+				actorUserId,
+				organizationId,
+				timesheetId,
+				ts.UserId,
+				title,
+				message);
+
 			return await BuildResponseAsync(timesheetId);
 		}
 
@@ -268,5 +339,19 @@ namespace Times.Services.Implementation
 			TotalMinutes = totalMinutes,
 			TotalHours = Math.Round(totalMinutes / 60m, 2)
 		};
+
+		private static string Truncate(string value, int maxLength)
+		{
+			if (string.IsNullOrEmpty(value)) return value;
+			return value.Length <= maxLength ? value : value.Substring(0, maxLength);
+		}
+
+		private async Task<string?> GetUserDisplayNameAsync(Guid userId)
+		{
+			var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+			if (user is null) return null;
+			var name = $"{user.FirstName} {user.LastName}".Trim();
+			return string.IsNullOrWhiteSpace(name) ? null : name;
+		}
 	}
 }
