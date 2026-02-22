@@ -91,6 +91,36 @@ namespace Times.Services.Implementation
 			return items.Select(t => Map(t, totalsMap.TryGetValue(t.Id, out var m) ? m : 0)).ToList();
 		}
 
+		public async Task<List<TimesheetResponse>> ListOrgAsync(Guid actorUserId, Guid organizationId, DateOnly? fromWeekStart = null, DateOnly? toWeekStart = null)
+		{
+			var canView = await _orgs.IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin, OrganizationRole.Manager);
+			if (!canView) return new List<TimesheetResponse>();
+
+			var q = _db.Timesheets
+				.AsNoTracking()
+				.Where(t => t.OrganizationId == organizationId);
+
+			if (fromWeekStart.HasValue)
+				q = q.Where(t => t.WeekStartDate >= NormalizeToWeekStart(fromWeekStart.Value));
+
+			if (toWeekStart.HasValue)
+				q = q.Where(t => t.WeekStartDate <= NormalizeToWeekStart(toWeekStart.Value));
+
+			var items = await q.OrderByDescending(t => t.WeekStartDate).ThenBy(t => t.UserId).ToListAsync();
+			var ids = items.Select(x => x.Id).ToList();
+
+			var totals = await _db.TimesheetEntries
+				.AsNoTracking()
+				.Where(e => ids.Contains(e.TimesheetId) && !e.IsDeleted)
+				.GroupBy(e => e.TimesheetId)
+				.Select(g => new { TimesheetId = g.Key, TotalMinutes = g.Sum(x => x.DurationMinutes) })
+				.ToListAsync();
+
+			var totalsMap = totals.ToDictionary(x => x.TimesheetId, x => x.TotalMinutes);
+
+			return items.Select(t => Map(t, totalsMap.TryGetValue(t.Id, out var m) ? m : 0)).ToList();
+		}
+
 		public async Task<TimesheetResponse?> GetByIdAsync(Guid actorUserId, Guid organizationId, Guid timesheetId)
 		{
 			// Owner OR manager/admin in the org can view

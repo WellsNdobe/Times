@@ -9,6 +9,11 @@ namespace Times.Services.Contracts
 	{
 		Task<TimesheetResponse> CreateAsync(Guid actorUserId, Guid organizationId, CreateTimesheetRequest request);
 
+		/// <summary>
+		/// Manager/Admin: list timesheets for the organization.
+		/// </summary>
+		Task<List<TimesheetResponse>> ListOrgAsync(Guid actorUserId, Guid organizationId, DateOnly? fromWeekStart = null, DateOnly? toWeekStart = null);
+
 		Task<List<TimesheetResponse>> ListMineAsync(Guid actorUserId, Guid organizationId, DateOnly? fromWeekStart = null, DateOnly? toWeekStart = null);
 
 		Task<TimesheetResponse?> GetByIdAsync(Guid actorUserId, Guid organizationId, Guid timesheetId);

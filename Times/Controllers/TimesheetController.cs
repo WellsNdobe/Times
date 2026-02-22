@@ -36,6 +36,18 @@ namespace Times.Controllers
 			return CreatedAtAction(nameof(GetById), new { organizationId, timesheetId = created.Id }, created);
 		}
 
+		// Manager/Admin: list timesheets for the organization
+		[HttpGet]
+		public async Task<IActionResult> List(
+			[FromRoute] Guid organizationId,
+			[FromQuery] DateOnly? fromWeekStart = null,
+			[FromQuery] DateOnly? toWeekStart = null)
+		{
+			var actorUserId = GetUserId();
+			var items = await _timesheets.ListOrgAsync(actorUserId, organizationId, fromWeekStart, toWeekStart);
+			return Ok(items);
+		}
+
 		// Manager/Admin: list timesheets pending approval (Submitted status)
 		[HttpGet("pending-approval")]
 		public async Task<IActionResult> PendingApproval(
