@@ -158,8 +158,10 @@ namespace Times.Services.Implementation
 
 		public async Task<List<OrganizationMemberResponse>> GetMembersAsync(Guid actorUserId, Guid organizationId)
 		{
-			var canView = await IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin, OrganizationRole.Manager);
-			if (!canView) throw new ForbiddenException("Only Admin/Manager can view organization members.");
+			var isMember = await _db.OrganizationMembers
+				.AsNoTracking()
+				.AnyAsync(m => m.OrganizationId == organizationId && m.UserId == actorUserId && m.IsActive);
+			if (!isMember) throw new ForbiddenException("You are not a member of this organization.");
 
 			// Optional: if you want a cleaner error when org doesn't exist
 			// you can check existence here and throw NotFoundException.

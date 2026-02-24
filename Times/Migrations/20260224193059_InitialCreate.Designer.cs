@@ -12,8 +12,8 @@ using Times.Database;
 namespace Times.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20260125163033_AddTimesheets")]
-    partial class AddTimesheets
+    [Migration("20260224193059_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -52,6 +52,59 @@ namespace Times.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Clients");
+                });
+
+            modelBuilder.Entity("Times.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ReadAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("RecipientUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("TimesheetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("RecipientUserId");
+
+                    b.HasIndex("TimesheetId");
+
+                    b.HasIndex("OrganizationId", "RecipientUserId", "IsRead", "CreatedAtUtc");
+
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("Times.Entities.Organization", b =>
@@ -149,6 +202,41 @@ namespace Times.Migrations
                     b.HasIndex("OrganizationId");
 
                     b.ToTable("Projects");
+                });
+
+            modelBuilder.Entity("Times.Entities.ProjectAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("AssignedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("AssignedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedByUserId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ProjectId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ProjectAssignments");
                 });
 
             modelBuilder.Entity("Times.Entities.Timesheet", b =>
@@ -319,6 +407,39 @@ namespace Times.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Times.Entities.Notification", b =>
+                {
+                    b.HasOne("Times.Entities.User", "ActorUser")
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Times.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Times.Entities.User", "RecipientUser")
+                        .WithMany()
+                        .HasForeignKey("RecipientUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Times.Entities.Timesheet", "Timesheet")
+                        .WithMany()
+                        .HasForeignKey("TimesheetId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("ActorUser");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("RecipientUser");
+
+                    b.Navigation("Timesheet");
+                });
+
             modelBuilder.Entity("Times.Entities.OrganizationMember", b =>
                 {
                     b.HasOne("Times.Entities.Organization", "Organization")
@@ -353,6 +474,40 @@ namespace Times.Migrations
                     b.Navigation("Client");
 
                     b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("Times.Entities.ProjectAssignment", b =>
+                {
+                    b.HasOne("Times.Entities.User", "AssignedByUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Times.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Times.Entities.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Times.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AssignedByUser");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Times.Entities.Timesheet", b =>

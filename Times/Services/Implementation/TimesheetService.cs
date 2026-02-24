@@ -14,11 +14,13 @@ namespace Times.Services.Implementation
 	{
 		private readonly DataContext _db;
 		private readonly IOrganizationService _orgs;
+		private readonly INotificationService _notifications;
 
-		public TimesheetService(DataContext db, IOrganizationService orgs)
+		public TimesheetService(DataContext db, IOrganizationService orgs, INotificationService notifications)
 		{
 			_db = db;
 			_orgs = orgs;
+			_notifications = notifications;
 		}
 
 		public async Task<TimesheetResponse> CreateAsync(Guid actorUserId, Guid organizationId, CreateTimesheetRequest request)
@@ -164,6 +166,7 @@ namespace Times.Services.Implementation
 			// ts.LockedAtUtc = now;
 
 			await _db.SaveChangesAsync();
+			await _notifications.NotifyTimesheetSubmittedAsync(actorUserId, ts);
 			return await BuildResponseAsync(timesheetId);
 		}
 
@@ -192,6 +195,7 @@ namespace Times.Services.Implementation
 			ts.UpdatedAtUtc = now;
 
 			await _db.SaveChangesAsync();
+			await _notifications.NotifyTimesheetApprovedAsync(actorUserId, ts, request.Comment);
 			return await BuildResponseAsync(timesheetId);
 		}
 
@@ -224,6 +228,7 @@ namespace Times.Services.Implementation
 			ts.UpdatedAtUtc = now;
 
 			await _db.SaveChangesAsync();
+			await _notifications.NotifyTimesheetRejectedAsync(actorUserId, ts, request.Reason);
 			return await BuildResponseAsync(timesheetId);
 		}
 

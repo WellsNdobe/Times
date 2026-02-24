@@ -20,7 +20,6 @@ namespace Times.Entities
 
 		public Guid? AssignedByUserId { get; set; }
 		public User? AssignedByUser { get; set; }
-
 		public DateTime AssignedAtUtc { get; set; } = DateTime.UtcNow;
 	}
 }
