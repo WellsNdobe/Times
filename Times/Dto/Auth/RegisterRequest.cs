@@ -4,6 +4,7 @@ namespace Times.Dto.Auth
 		string Email,
 		string Password,
 		string FirstName,
-		string LastName
+		string LastName,
+		string OrganizationName
 	);
 }

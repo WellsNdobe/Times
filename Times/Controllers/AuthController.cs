@@ -6,8 +6,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Times.Database;
 using Times.Dto.Auth;
+using Times.Dto.Organizations;
 using Times.Entities;
 using Times.Infrastructure.Auth;
+using Times.Services.Contracts;
 using Times.Services.Errors;
 
 namespace Times.Controllers
@@ -21,12 +23,18 @@ namespace Times.Controllers
 		private readonly PasswordHasher<User> _passwordHasher;
 		private readonly JwtTokenService _jwt;
 		private readonly IRevokedTokenStore _revokedTokenStore;
+		private readonly IOrganizationService _orgs;
 
-		public AuthController(DataContext db, JwtTokenService jwt, IRevokedTokenStore revokedTokenStore)
+		public AuthController(
+			DataContext db,
+			JwtTokenService jwt,
+			IRevokedTokenStore revokedTokenStore,
+			IOrganizationService orgs)
 		{
 			_db = db;
 			_jwt = jwt;
 			_revokedTokenStore = revokedTokenStore;
+			_orgs = orgs;
 			_passwordHasher = new PasswordHasher<User>();
 		}
 
@@ -38,23 +46,28 @@ namespace Times.Controllers
 			if (errors.Count > 0)
 				throw new ValidationException("Registration validation failed.", errors);
 
-			var emailExists = await _db.Users.AnyAsync(u => u.Email == request.Email);
+			var email = request.Email.Trim();
+			var emailExists = await _db.Users.AnyAsync(u => u.Email == email);
 			if (emailExists)
 				throw new ConflictException("Email already registered.");
 
 			var user = new User
 			{
 				Id = Guid.NewGuid(),
-				Email = request.Email.Trim(),
+				Email = email,
 				FirstName = request.FirstName?.Trim() ?? string.Empty,
 				LastName = request.LastName?.Trim() ?? string.Empty
 			};
 			user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
+			await using var transaction = await _db.Database.BeginTransactionAsync();
 			_db.Users.Add(user);
 			await _db.SaveChangesAsync();
+			await _orgs.CreateAsync(user.Id, new CreateOrganizationRequest { Name = request.OrganizationName });
+			await transaction.CommitAsync();
 
-			return Ok(new AuthResponse(user.Id, user.Email, Token: null));
+			var token = _jwt.GenerateToken(user);
+			return Ok(new AuthResponse(user.Id, user.Email, token));
 		}
 
 		// POST: api/auth/login
@@ -122,6 +135,8 @@ namespace Times.Controllers
 				AddError(errors, "FirstName", "First name is required.");
 			if (string.IsNullOrWhiteSpace(request.LastName))
 				AddError(errors, "LastName", "Last name is required.");
+			if (string.IsNullOrWhiteSpace(request.OrganizationName))
+				AddError(errors, "OrganizationName", "Organization name is required.");
 			return errors;
 		}
 
