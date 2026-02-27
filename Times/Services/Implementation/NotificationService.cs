@@ -252,8 +252,10 @@ namespace Times.Services.Implementation
 			Type = (int)n.Type,
 			Title = n.Title,
 			Message = n.Message,
-			CreatedAtUtc = n.CreatedAtUtc,
-			ReadAtUtc = n.ReadAtUtc,
+			CreatedAtUtc = DateTime.SpecifyKind(n.CreatedAtUtc, DateTimeKind.Utc),
+			ReadAtUtc = n.ReadAtUtc.HasValue
+				? DateTime.SpecifyKind(n.ReadAtUtc.Value, DateTimeKind.Utc)
+				: null,
 			IsRead = n.IsRead
 		};
 
@@ -264,4 +266,3 @@ namespace Times.Services.Implementation
 		}
 	}
 }
-
