@@ -356,6 +356,103 @@ namespace Times.Migrations
                     b.ToTable("TimesheetEntries");
                 });
 
+            modelBuilder.Entity("Times.Database.Views.ReportingEntryFact", b =>
+                {
+                    b.Property<string>("ClientName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("EntryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProjectName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TimesheetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("TimesheetStatus")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserFirstName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserLastName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly>("WeekEndDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("WeekStartDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("WorkDate")
+                        .HasColumnType("date");
+
+                    b.HasNoKey();
+
+                    b.ToView("vw_ReportingEntryFacts", (string)null);
+                });
+
+            modelBuilder.Entity("Times.Database.Views.ReportingTimesheetFact", b =>
+                {
+                    b.Property<int>("EntryCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TimesheetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("TimesheetStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserFirstName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserLastName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly>("WeekEndDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("WeekStartDate")
+                        .HasColumnType("date");
+
+                    b.HasNoKey();
+
+                    b.ToView("vw_ReportingTimesheetFacts", (string)null);
+                });
+
             modelBuilder.Entity("Times.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")

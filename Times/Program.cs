@@ -61,6 +61,7 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ITimesheetService, TimesheetService>();
 builder.Services.AddScoped<ITimesheetEntryService, TimesheetEntryService>();
+builder.Services.AddScoped<IReportingService, ReportingService>();
 builder.Services.AddOpenApi();
 
 

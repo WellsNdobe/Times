@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Times.Database.Views;
 using Times.Entities;
 
 namespace Times.Database
@@ -21,10 +22,24 @@ namespace Times.Database
 		public DbSet<Timesheet> Timesheets => Set<Timesheet>();
 		public DbSet<TimesheetEntry> TimesheetEntries => Set<TimesheetEntry>();
 		public DbSet<Notification> Notifications => Set<Notification>();
+		public DbSet<ReportingTimesheetFact> ReportingTimesheetFacts => Set<ReportingTimesheetFact>();
+		public DbSet<ReportingEntryFact> ReportingEntryFacts => Set<ReportingEntryFact>();
 
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{
 			base.OnModelCreating(modelBuilder);
+
+			modelBuilder.Entity<ReportingTimesheetFact>(b =>
+			{
+				b.HasNoKey();
+				b.ToView("vw_ReportingTimesheetFacts");
+			});
+
+			modelBuilder.Entity<ReportingEntryFact>(b =>
+			{
+				b.HasNoKey();
+				b.ToView("vw_ReportingEntryFacts");
+			});
 
 			// ---- ProjectAssignment ----
 			modelBuilder.Entity<ProjectAssignment>(b =>
