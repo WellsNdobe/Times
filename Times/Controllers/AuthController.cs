@@ -63,11 +63,17 @@ namespace Times.Controllers
 			await using var transaction = await _db.Database.BeginTransactionAsync();
 			_db.Users.Add(user);
 			await _db.SaveChangesAsync();
-			await _orgs.CreateAsync(user.Id, new CreateOrganizationRequest { Name = request.OrganizationName });
+			var organization = await _orgs.CreateAsync(user.Id, new CreateOrganizationRequest { Name = request.OrganizationName });
 			await transaction.CommitAsync();
 
 			var token = _jwt.GenerateToken(user);
-			return Ok(new AuthResponse(user.Id, user.Email, token));
+			return Ok(new AuthResponse(
+				user.Id,
+				user.Email,
+				token,
+				organization.Id,
+				organization.Name
+			));
 		}
 
 		// POST: api/auth/login

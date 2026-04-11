@@ -20,6 +20,7 @@ namespace Times.Database
 
 		public DbSet<Timesheet> Timesheets => Set<Timesheet>();
 		public DbSet<TimesheetEntry> TimesheetEntries => Set<TimesheetEntry>();
+		public DbSet<ActiveTimerSession> ActiveTimerSessions => Set<ActiveTimerSession>();
 		public DbSet<Notification> Notifications => Set<Notification>();
 
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -110,6 +111,39 @@ namespace Times.Database
 				b.HasOne(x => x.Organization)
 					.WithMany()
 					.HasForeignKey(x => x.OrganizationId)
+					.OnDelete(DeleteBehavior.NoAction);
+			});
+
+			// ---- ActiveTimerSession ----
+			modelBuilder.Entity<ActiveTimerSession>(b =>
+			{
+				b.HasKey(x => x.Id);
+
+				// One active session per org/user
+				b.HasIndex(x => new { x.OrganizationId, x.UserId }).IsUnique();
+				b.HasIndex(x => new { x.OrganizationId, x.TimesheetId });
+				b.HasIndex(x => new { x.OrganizationId, x.ProjectId });
+
+				b.Property(x => x.Notes).HasMaxLength(2000);
+
+				b.HasOne(x => x.Organization)
+					.WithMany()
+					.HasForeignKey(x => x.OrganizationId)
+					.OnDelete(DeleteBehavior.NoAction);
+
+				b.HasOne(x => x.User)
+					.WithMany()
+					.HasForeignKey(x => x.UserId)
+					.OnDelete(DeleteBehavior.Cascade);
+
+				b.HasOne(x => x.Timesheet)
+					.WithMany()
+					.HasForeignKey(x => x.TimesheetId)
+					.OnDelete(DeleteBehavior.Cascade);
+
+				b.HasOne(x => x.Project)
+					.WithMany()
+					.HasForeignKey(x => x.ProjectId)
 					.OnDelete(DeleteBehavior.NoAction);
 			});
 
