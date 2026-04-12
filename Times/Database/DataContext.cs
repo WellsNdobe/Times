@@ -134,7 +134,7 @@ namespace Times.Database
 				b.HasOne(x => x.User)
 					.WithMany()
 					.HasForeignKey(x => x.UserId)
-					.OnDelete(DeleteBehavior.Cascade);
+					.OnDelete(DeleteBehavior.NoAction);
 
 				b.HasOne(x => x.Timesheet)
 					.WithMany()

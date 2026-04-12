@@ -80,9 +80,7 @@ namespace Times.Services.Implementation
 					WorkDate = request.WorkDate,
 					Notes = NormalizeNotes(request.Notes),
 					StartedAtUtc = now,
-					UtcOffsetMinutes = request.UtcOffsetMinutes,
-					CreatedAtUtc = now,
-					UpdatedAtUtc = now
+					UtcOffsetMinutes = request.UtcOffsetMinutes
 				};
 				_db.ActiveTimerSessions.Add(session);
 			}
@@ -94,7 +92,6 @@ namespace Times.Services.Implementation
 				session.Notes = NormalizeNotes(request.Notes);
 				session.StartedAtUtc = now;
 				session.UtcOffsetMinutes = request.UtcOffsetMinutes;
-				session.UpdatedAtUtc = now;
 			}
 
 			timesheet.UpdatedAtUtc = now;
@@ -114,7 +111,6 @@ namespace Times.Services.Implementation
 				throw new NotFoundException("No active timer session found.");
 
 			session.Notes = NormalizeNotes(request.Notes);
-			session.UpdatedAtUtc = DateTime.UtcNow;
 			await _db.SaveChangesAsync();
 
 			return Map(session);
@@ -224,9 +220,7 @@ namespace Times.Services.Implementation
 			WorkDate = session.WorkDate,
 			Notes = session.Notes,
 			StartedAtUtc = session.StartedAtUtc,
-			UtcOffsetMinutes = session.UtcOffsetMinutes,
-			CreatedAtUtc = session.CreatedAtUtc,
-			UpdatedAtUtc = session.UpdatedAtUtc
+			UtcOffsetMinutes = session.UtcOffsetMinutes
 		};
 
 		private static TimesheetEntryResponse Map(TimesheetEntry entry) => new TimesheetEntryResponse

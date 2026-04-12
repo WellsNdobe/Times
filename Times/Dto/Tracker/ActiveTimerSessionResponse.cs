@@ -13,7 +13,5 @@ namespace Times.Dto.Tracker
 		public string? Notes { get; set; }
 		public DateTime StartedAtUtc { get; set; }
 		public int UtcOffsetMinutes { get; set; }
-		public DateTime CreatedAtUtc { get; set; }
-		public DateTime UpdatedAtUtc { get; set; }
 	}
 }

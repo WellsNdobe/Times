@@ -23,8 +23,5 @@ namespace Times.Entities
 
 		public DateTime StartedAtUtc { get; set; } = DateTime.UtcNow;
 		public int UtcOffsetMinutes { get; set; }
-
-		public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
-		public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 	}
 }
