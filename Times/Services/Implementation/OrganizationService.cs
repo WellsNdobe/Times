@@ -66,9 +66,25 @@ namespace Times.Services.Implementation
 			if (!HasRole(user.Role, "Admin"))
 				user.Role = string.IsNullOrWhiteSpace(user.Role) ? "Admin" : $"{user.Role},Admin";
 
+			var settings = new OrganizationSettings
+			{
+				Organization = org,
+				OrganizationId = org.Id,
+				WeekStartDay = WeekStartDay.Monday,
+				AllowFutureTimesheets = true,
+				FutureTimesheetWindowDays = 7,
+				LockTimesheetOnSubmit = true,
+				AllowOvernightEntries = false,
+				CreatedAtUtc = now,
+				UpdatedAtUtc = now,
+				UpdatedByUserId = actorUserId
+			};
+
 			_db.Organizations.Add(org);
 			_db.OrganizationMembers.Add(membership);
+			_db.OrganizationSettings.Add(settings);
 			org.Members.Add(membership);
+			org.Settings = settings;
 
 			try
 			{

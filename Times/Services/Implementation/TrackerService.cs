@@ -12,15 +12,17 @@ using Times.Services.Errors;
 
 namespace Times.Services.Implementation
 {
-	public class TrackerService : ITrackerService
-	{
-		private readonly DataContext _db;
-		private readonly IOrganizationService _orgs;
+		public class TrackerService : ITrackerService
+		{
+			private readonly DataContext _db;
+			private readonly IOrganizationService _orgs;
+			private readonly IOrganizationSettingsService _settings;
 
-		public TrackerService(DataContext db, IOrganizationService orgs)
+		public TrackerService(DataContext db, IOrganizationService orgs, IOrganizationSettingsService settings)
 		{
 			_db = db;
 			_orgs = orgs;
+			_settings = settings;
 		}
 
 		public async Task<ActiveTimerSessionResponse?> GetActiveSessionAsync(Guid actorUserId, Guid organizationId)
@@ -47,7 +49,8 @@ namespace Times.Services.Implementation
 			if (timesheet.UserId != actorUserId)
 				throw new ForbiddenException("You can only track time against your own timesheet.");
 
-			EnsureEditable(timesheet);
+			var settings = await _settings.GetForOrganizationAsync(organizationId);
+			EnsureEditable(timesheet, settings);
 
 			if (request.WorkDate < timesheet.WeekStartDate || request.WorkDate > timesheet.WeekEndDate)
 				throw new ValidationException("WorkDate must fall within the timesheet week.", new Dictionary<string, string[]>
@@ -135,7 +138,8 @@ namespace Times.Services.Implementation
 			if (timesheet.UserId != actorUserId)
 				throw new ForbiddenException("You can only stop your own active timer.");
 
-			EnsureEditable(timesheet);
+			var settings = await _settings.GetForOrganizationAsync(organizationId);
+			EnsureEditable(timesheet, settings);
 
 			var projectExists = await _db.Projects
 				.AsNoTracking()
@@ -151,6 +155,12 @@ namespace Times.Services.Implementation
 			var durationMinutes = (int)Math.Max(1, Math.Round((nowUtc - session.StartedAtUtc).TotalMinutes));
 			var startLocal = session.StartedAtUtc.AddMinutes(session.UtcOffsetMinutes);
 			var endLocal = nowUtc.AddMinutes(session.UtcOffsetMinutes);
+
+			if (!settings.AllowOvernightEntries && startLocal.Date != endLocal.Date)
+				throw new ValidationException("Overnight entries are disabled for this organization.", new Dictionary<string, string[]>
+				{
+					["workDate"] = new[] { "Overnight entries are disabled for this organization." }
+				});
 
 			var entry = new TimesheetEntry
 			{
@@ -196,9 +206,9 @@ namespace Times.Services.Implementation
 				throw new ForbiddenException("You are not a member of this organization.");
 		}
 
-		private static void EnsureEditable(Timesheet timesheet)
+		private static void EnsureEditable(Timesheet timesheet, OrganizationSettings settings)
 		{
-			if (timesheet.Status == TimesheetStatus.Submitted || timesheet.Status == TimesheetStatus.Approved)
+			if (!OrganizationSettingsPolicy.IsEditable(timesheet.Status, settings))
 				throw new ValidationException("Timesheet is not editable in its current status.", new Dictionary<string, string[]>
 				{
 					["timesheetId"] = new[] { "Timesheet is not editable in its current status." }

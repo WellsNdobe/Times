@@ -14,12 +14,14 @@ namespace Times.Services.Implementation
 	{
 		private readonly DataContext _db;
 		private readonly IOrganizationService _orgs;
+		private readonly IOrganizationSettingsService _settings;
 		private readonly INotificationService _notifications;
 
-		public TimesheetService(DataContext db, IOrganizationService orgs, INotificationService notifications)
+		public TimesheetService(DataContext db, IOrganizationService orgs, IOrganizationSettingsService settings, INotificationService notifications)
 		{
 			_db = db;
 			_orgs = orgs;
+			_settings = settings;
 			_notifications = notifications;
 		}
 
@@ -29,8 +31,12 @@ namespace Times.Services.Implementation
 			var membership = await _orgs.GetMembershipAsync(actorUserId, organizationId);
 			if (membership is null) throw new UnauthorizedAccessException("You are not a member of this organization.");
 
-			var weekStart = NormalizeToWeekStart(request.WeekStartDate);
-			var weekEnd = weekStart.AddDays(6);
+			var settings = await _settings.GetForOrganizationAsync(organizationId);
+			var weekStart = OrganizationSettingsPolicy.NormalizeToWeekStart(request.WeekStartDate, settings.WeekStartDay);
+			var weekEnd = OrganizationSettingsPolicy.GetWeekEnd(weekStart);
+
+			if (!OrganizationSettingsPolicy.CanAccessWeekStart(weekStart, DateOnly.FromDateTime(DateTime.UtcNow), settings))
+				throw new ArgumentException("Timesheet week is outside the configured future window.");
 
 			// One timesheet per user per week per org
 			var existing = await _db.Timesheets
@@ -65,16 +71,17 @@ namespace Times.Services.Implementation
 		{
 			var membership = await _orgs.GetMembershipAsync(actorUserId, organizationId);
 			if (membership is null) return new List<TimesheetResponse>();
+			var settings = await _settings.GetForOrganizationAsync(organizationId);
 
 			var q = _db.Timesheets
 				.AsNoTracking()
 				.Where(t => t.OrganizationId == organizationId && t.UserId == actorUserId);
 
 			if (fromWeekStart.HasValue)
-				q = q.Where(t => t.WeekStartDate >= NormalizeToWeekStart(fromWeekStart.Value));
+				q = q.Where(t => t.WeekStartDate >= OrganizationSettingsPolicy.NormalizeToWeekStart(fromWeekStart.Value, settings.WeekStartDay));
 
 			if (toWeekStart.HasValue)
-				q = q.Where(t => t.WeekStartDate <= NormalizeToWeekStart(toWeekStart.Value));
+				q = q.Where(t => t.WeekStartDate <= OrganizationSettingsPolicy.NormalizeToWeekStart(toWeekStart.Value, settings.WeekStartDay));
 
 			var items = await q.OrderByDescending(t => t.WeekStartDate).ToListAsync();
 
@@ -97,16 +104,17 @@ namespace Times.Services.Implementation
 		{
 			var canView = await _orgs.IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin, OrganizationRole.Manager);
 			if (!canView) return new List<TimesheetResponse>();
+			var settings = await _settings.GetForOrganizationAsync(organizationId);
 
 			var q = _db.Timesheets
 				.AsNoTracking()
 				.Where(t => t.OrganizationId == organizationId);
 
 			if (fromWeekStart.HasValue)
-				q = q.Where(t => t.WeekStartDate >= NormalizeToWeekStart(fromWeekStart.Value));
+				q = q.Where(t => t.WeekStartDate >= OrganizationSettingsPolicy.NormalizeToWeekStart(fromWeekStart.Value, settings.WeekStartDay));
 
 			if (toWeekStart.HasValue)
-				q = q.Where(t => t.WeekStartDate <= NormalizeToWeekStart(toWeekStart.Value));
+				q = q.Where(t => t.WeekStartDate <= OrganizationSettingsPolicy.NormalizeToWeekStart(toWeekStart.Value, settings.WeekStartDay));
 
 			var items = await q.OrderByDescending(t => t.WeekStartDate).ThenBy(t => t.UserId).ToListAsync();
 			var ids = items.Select(x => x.Id).ToList();
@@ -156,14 +164,16 @@ namespace Times.Services.Implementation
 			if (!hasEntries)
 				throw new ArgumentException("Cannot submit an empty timesheet.");
 
+			var settings = await _settings.GetForOrganizationAsync(organizationId);
+			if (!OrganizationSettingsPolicy.CanAccessWeekStart(ts.WeekStartDate, DateOnly.FromDateTime(DateTime.UtcNow), settings))
+				throw new ArgumentException("Timesheet week is outside the configured future window.");
+
 			var now = DateTime.UtcNow;
 			ts.Status = TimesheetStatus.Submitted;
 			ts.SubmittedAtUtc = now;
 			ts.SubmissionComment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
+			ts.LockedAtUtc = settings.LockTimesheetOnSubmit ? now : null;
 			ts.UpdatedAtUtc = now;
-
-			// Optional: lock immediately on submit (MyHours typically locks on approval, but prevents edits in submitted state anyway)
-			// ts.LockedAtUtc = now;
 
 			await _db.SaveChangesAsync();
 			await _notifications.NotifyTimesheetSubmittedAsync(actorUserId, ts);
@@ -236,16 +246,17 @@ namespace Times.Services.Implementation
 		{
 			var canView = await _orgs.IsInRoleAsync(actorUserId, organizationId, OrganizationRole.Admin, OrganizationRole.Manager);
 			if (!canView) return new List<TimesheetResponse>();
+			var settings = await _settings.GetForOrganizationAsync(organizationId);
 
 			var q = _db.Timesheets
 				.AsNoTracking()
 				.Where(t => t.OrganizationId == organizationId && t.Status == TimesheetStatus.Submitted);
 
 			if (fromWeekStart.HasValue)
-				q = q.Where(t => t.WeekStartDate >= NormalizeToWeekStart(fromWeekStart.Value));
+				q = q.Where(t => t.WeekStartDate >= OrganizationSettingsPolicy.NormalizeToWeekStart(fromWeekStart.Value, settings.WeekStartDay));
 
 			if (toWeekStart.HasValue)
-				q = q.Where(t => t.WeekStartDate <= NormalizeToWeekStart(toWeekStart.Value));
+				q = q.Where(t => t.WeekStartDate <= OrganizationSettingsPolicy.NormalizeToWeekStart(toWeekStart.Value, settings.WeekStartDay));
 
 			var items = await q.OrderBy(t => t.WeekStartDate).ThenBy(t => t.SubmittedAtUtc).ToListAsync();
 			var ids = items.Select(x => x.Id).ToList();
@@ -263,15 +274,6 @@ namespace Times.Services.Implementation
 		}
 
 		// Helpers
-
-		private static DateOnly NormalizeToWeekStart(DateOnly date)
-		{
-			// Standardize to Monday-start weeks (MyHours-style expectation).
-			// DayOfWeek: Sunday=0, Monday=1, ... Saturday=6
-			var dow = (int)date.DayOfWeek;
-			var offset = dow == 0 ? 6 : dow - 1; // Sunday -> 6 days back, Monday -> 0
-			return date.AddDays(-offset);
-		}
 
 		private async Task<TimesheetResponse> BuildResponseAsync(Guid timesheetId)
 		{

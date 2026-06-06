@@ -57,6 +57,7 @@ builder.Services.AddDbContext<DataContext>(options =>
 );
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
+builder.Services.AddScoped<IOrganizationSettingsService, OrganizationSettingsService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ITimesheetService, TimesheetService>();

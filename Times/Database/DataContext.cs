@@ -14,6 +14,7 @@ namespace Times.Database
 		public DbSet<Client> Clients => Set<Client>();
 		public DbSet<OrganizationMember> OrganizationMembers => Set<OrganizationMember>();
 		public DbSet<Organization> Organizations => Set<Organization>();
+		public DbSet<OrganizationSettings> OrganizationSettings => Set<OrganizationSettings>();
 
 		public DbSet<Project> Projects => Set<Project>();
 		public DbSet<ProjectAssignment> ProjectAssignments => Set<ProjectAssignment>();
@@ -111,6 +112,27 @@ namespace Times.Database
 				b.HasOne(x => x.Organization)
 					.WithMany()
 					.HasForeignKey(x => x.OrganizationId)
+					.OnDelete(DeleteBehavior.NoAction);
+			});
+
+			modelBuilder.Entity<OrganizationSettings>(b =>
+			{
+				b.HasKey(x => x.OrganizationId);
+
+				b.Property(x => x.WeekStartDay).IsRequired();
+				b.Property(x => x.FutureTimesheetWindowDays).IsRequired();
+				b.Property(x => x.AllowFutureTimesheets).IsRequired();
+				b.Property(x => x.LockTimesheetOnSubmit).IsRequired();
+				b.Property(x => x.AllowOvernightEntries).IsRequired();
+
+				b.HasOne(x => x.Organization)
+					.WithOne(x => x.Settings)
+					.HasForeignKey<OrganizationSettings>(x => x.OrganizationId)
+					.OnDelete(DeleteBehavior.Cascade);
+
+				b.HasOne(x => x.UpdatedByUser)
+					.WithMany()
+					.HasForeignKey(x => x.UpdatedByUserId)
 					.OnDelete(DeleteBehavior.NoAction);
 			});
 
