@@ -15,5 +15,6 @@ namespace Times.Entities
 		public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 
 		public ICollection<OrganizationMember> Members { get; set; } = new List<OrganizationMember>();
+		public OrganizationSettings? Settings { get; set; }
 	}
 }

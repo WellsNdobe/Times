@@ -10,16 +10,18 @@ using Times.Services.Contracts;
 
 namespace Times.Services.Implementation
 {
-	public class TimesheetEntryService : ITimesheetEntryService
-	{
-		private readonly DataContext _db;
-		private readonly IOrganizationService _orgs;
-
-		public TimesheetEntryService(DataContext db, IOrganizationService orgs)
+		public class TimesheetEntryService : ITimesheetEntryService
 		{
-			_db = db;
-			_orgs = orgs;
-		}
+			private readonly DataContext _db;
+			private readonly IOrganizationService _orgs;
+			private readonly IOrganizationSettingsService _settings;
+
+			public TimesheetEntryService(DataContext db, IOrganizationService orgs, IOrganizationSettingsService settings)
+			{
+				_db = db;
+				_orgs = orgs;
+				_settings = settings;
+			}
 
 		public async Task<List<TimesheetEntryResponse>> ListAsync(Guid actorUserId, Guid organizationId, Guid timesheetId)
 		{
@@ -47,11 +49,12 @@ namespace Times.Services.Implementation
 		{
 			var ts = await _db.Timesheets.FirstOrDefaultAsync(t => t.Id == timesheetId && t.OrganizationId == organizationId);
 			if (ts is null) throw new KeyNotFoundException("Timesheet not found.");
+			var settings = await _settings.GetForOrganizationAsync(organizationId);
 
 			// Only owner can add entries
 			if (ts.UserId != actorUserId) throw new UnauthorizedAccessException("Only the owner can edit this timesheet.");
 
-			EnsureEditable(ts);
+			EnsureEditable(ts, settings);
 
 			// Validate date is within week range
 			if (request.WorkDate < ts.WeekStartDate || request.WorkDate > ts.WeekEndDate)
@@ -64,7 +67,7 @@ namespace Times.Services.Implementation
 
 			if (!projectOk) throw new ArgumentException("Project does not belong to this organization (or is inactive).");
 
-			var duration = ComputeDurationMinutes(request.StartTime, request.EndTime, request.DurationMinutes);
+			var duration = OrganizationSettingsPolicy.ComputeDurationMinutes(request.StartTime, request.EndTime, request.DurationMinutes, settings.AllowOvernightEntries);
 
 			var now = DateTime.UtcNow;
 
@@ -97,10 +100,11 @@ namespace Times.Services.Implementation
 		{
 			var ts = await _db.Timesheets.FirstOrDefaultAsync(t => t.Id == timesheetId && t.OrganizationId == organizationId);
 			if (ts is null) return null;
+			var settings = await _settings.GetForOrganizationAsync(organizationId);
 
 			if (ts.UserId != actorUserId) return null;
 
-			EnsureEditable(ts);
+			EnsureEditable(ts, settings);
 
 			var entry = await _db.TimesheetEntries
 				.FirstOrDefaultAsync(e => e.Id == entryId && e.OrganizationId == organizationId && e.TimesheetId == timesheetId);
@@ -152,7 +156,7 @@ namespace Times.Services.Implementation
 			// Otherwise recompute only if start/end changed (handled below)
 			if (request.DurationMinutes.HasValue || request.StartTime.HasValue || request.EndTime.HasValue)
 			{
-				var computed = ComputeDurationMinutes(entry.StartTime, entry.EndTime, request.DurationMinutes);
+				var computed = OrganizationSettingsPolicy.ComputeDurationMinutes(entry.StartTime, entry.EndTime, request.DurationMinutes, settings.AllowOvernightEntries);
 				entry.DurationMinutes = computed;
 			}
 
@@ -167,10 +171,11 @@ namespace Times.Services.Implementation
 		{
 			var ts = await _db.Timesheets.FirstOrDefaultAsync(t => t.Id == timesheetId && t.OrganizationId == organizationId);
 			if (ts is null) return false;
+			var settings = await _settings.GetForOrganizationAsync(organizationId);
 
 			if (ts.UserId != actorUserId) return false;
 
-			EnsureEditable(ts);
+			EnsureEditable(ts, settings);
 
 			var entry = await _db.TimesheetEntries
 				.FirstOrDefaultAsync(e => e.Id == entryId && e.OrganizationId == organizationId && e.TimesheetId == timesheetId);
@@ -187,31 +192,10 @@ namespace Times.Services.Implementation
 
 		// Helpers
 
-		private static void EnsureEditable(Timesheet ts)
+		private static void EnsureEditable(Timesheet ts, OrganizationSettings settings)
 		{
-			if (ts.Status == TimesheetStatus.Submitted || ts.Status == TimesheetStatus.Approved)
+			if (!OrganizationSettingsPolicy.IsEditable(ts.Status, settings))
 				throw new ArgumentException("Timesheet is not editable in its current status.");
-		}
-
-		private static int ComputeDurationMinutes(TimeOnly? start, TimeOnly? end, int? durationMinutes)
-		{
-			// Either (start+end) OR durationMinutes
-			if (durationMinutes.HasValue)
-			{
-				if (durationMinutes.Value <= 0) throw new ArgumentException("DurationMinutes must be greater than 0.");
-				return durationMinutes.Value;
-			}
-
-			if (!start.HasValue || !end.HasValue)
-				throw new ArgumentException("Provide either DurationMinutes, or both StartTime and EndTime.");
-
-			// MVP: disallow overnight shifts (end must be after start)
-			if (end.Value <= start.Value)
-				throw new ArgumentException("EndTime must be after StartTime.");
-
-			var minutes = (int)(end.Value.ToTimeSpan() - start.Value.ToTimeSpan()).TotalMinutes;
-			if (minutes <= 0) throw new ArgumentException("Calculated duration must be greater than 0.");
-			return minutes;
 		}
 
 		private async Task<Timesheet?> GetTimesheetOrNullAsync(Guid organizationId, Guid timesheetId)

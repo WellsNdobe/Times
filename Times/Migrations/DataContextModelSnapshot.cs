@@ -177,6 +177,42 @@ namespace Times.Migrations
                     b.ToTable("Organizations");
                 });
 
+            modelBuilder.Entity("Times.Entities.OrganizationSettings", b =>
+                {
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AllowFutureTimesheets")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("AllowOvernightEntries")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FutureTimesheetWindowDays")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("LockTimesheetOnSubmit")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("WeekStartDay")
+                        .HasColumnType("int");
+
+                    b.HasKey("OrganizationId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.ToTable("OrganizationSettings");
+                });
+
             modelBuilder.Entity("Times.Entities.OrganizationMember", b =>
                 {
                     b.Property<Guid>("Id")
@@ -540,6 +576,24 @@ namespace Times.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Times.Entities.OrganizationSettings", b =>
+                {
+                    b.HasOne("Times.Entities.Organization", "Organization")
+                        .WithOne("Settings")
+                        .HasForeignKey("Times.Entities.OrganizationSettings", "OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Times.Entities.User", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("UpdatedByUser");
+                });
+
             modelBuilder.Entity("Times.Entities.Project", b =>
                 {
                     b.HasOne("Times.Entities.Client", "Client")
@@ -647,6 +701,8 @@ namespace Times.Migrations
             modelBuilder.Entity("Times.Entities.Organization", b =>
                 {
                     b.Navigation("Members");
+
+                    b.Navigation("Settings");
                 });
 
             modelBuilder.Entity("Times.Entities.Timesheet", b =>
